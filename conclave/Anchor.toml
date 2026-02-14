@@ -8,6 +8,9 @@ skip-lint = false
 [programs.localnet]
 conclave = "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU"
 
+[programs.devnet]
+conclave = "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU"
+
 [registry]
 url = "https://api.apr.dev"
 
