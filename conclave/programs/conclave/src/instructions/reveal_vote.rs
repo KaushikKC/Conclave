@@ -2,12 +2,16 @@ use anchor_lang::prelude::*;
 use sha2::{Sha256, Digest};
 use crate::state::{Proposal, VoteCommitment};
 use crate::errors::ConclaveError;
+use crate::events::VoteRevealed;
 
 #[derive(Accounts)]
 pub struct RevealVote<'info> {
     pub voter: Signer<'info>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        constraint = !proposal.is_finalized @ ConclaveError::AlreadyFinalized,
+    )]
     pub proposal: Account<'info, Proposal>,
 
     #[account(
@@ -50,6 +54,15 @@ pub fn handler(ctx: Context<RevealVote>, vote_choice: u8, nonce: [u8; 32]) -> Re
     }
 
     ctx.accounts.vote_commitment.is_revealed = true;
+
+    emit!(VoteRevealed {
+        proposal: proposal.key(),
+        voter: ctx.accounts.voter.key(),
+        vote_choice,
+        vote_yes_count: proposal.vote_yes_count,
+        vote_no_count: proposal.vote_no_count,
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::{DaoRoom, Member, Proposal};
 use crate::errors::ConclaveError;
+use crate::events::ProposalCreated;
 
 #[derive(Accounts)]
 #[instruction(title: String, _description: String)]
@@ -50,7 +51,7 @@ pub fn handler(
     let proposal = &mut ctx.accounts.proposal;
     proposal.room = ctx.accounts.room.key();
     proposal.creator = ctx.accounts.creator.key();
-    proposal.title = title;
+    proposal.title = title.clone();
     proposal.description = description;
     proposal.vote_yes_count = 0;
     proposal.vote_no_count = 0;
@@ -60,6 +61,15 @@ pub fn handler(
 
     let room = &mut ctx.accounts.room;
     room.proposal_count = room.proposal_count.checked_add(1).unwrap();
+
+    emit!(ProposalCreated {
+        room: room.key(),
+        proposal: proposal.key(),
+        creator: ctx.accounts.creator.key(),
+        title,
+        deadline,
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 pub mod errors;
+pub mod events;
 pub mod state;
 pub mod instructions;
 
@@ -10,6 +11,10 @@ pub use instructions::create_proposal::*;
 pub use instructions::cast_vote::*;
 pub use instructions::reveal_vote::*;
 pub use instructions::send_message::*;
+pub use instructions::finalize_proposal::*;
+pub use instructions::close_message::*;
+pub use instructions::close_vote::*;
+pub use instructions::update_member_key::*;
 
 declare_id!("E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU");
 
@@ -52,5 +57,24 @@ pub mod conclave {
         timestamp: i64,
     ) -> Result<()> {
         instructions::send_message::handler(ctx, ciphertext, timestamp)
+    }
+
+    pub fn finalize_proposal(ctx: Context<FinalizeProposal>) -> Result<()> {
+        instructions::finalize_proposal::handler(ctx)
+    }
+
+    pub fn close_message(ctx: Context<CloseMessage>) -> Result<()> {
+        instructions::close_message::handler(ctx)
+    }
+
+    pub fn close_vote(ctx: Context<CloseVote>) -> Result<()> {
+        instructions::close_vote::handler(ctx)
+    }
+
+    pub fn update_member_key(
+        ctx: Context<UpdateMemberKey>,
+        new_encrypted_group_key: Vec<u8>,
+    ) -> Result<()> {
+        instructions::update_member_key::handler(ctx, new_encrypted_group_key)
     }
 }

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::{DaoRoom, Member, Proposal, VoteCommitment};
 use crate::errors::ConclaveError;
+use crate::events::VoteCast;
 
 #[derive(Accounts)]
 pub struct CastVote<'info> {
@@ -17,6 +18,7 @@ pub struct CastVote<'info> {
 
     #[account(
         constraint = proposal.room == room.key(),
+        constraint = !proposal.is_finalized @ ConclaveError::AlreadyFinalized,
     )]
     pub proposal: Account<'info, Proposal>,
 
@@ -45,6 +47,12 @@ pub fn handler(ctx: Context<CastVote>, commitment: [u8; 32]) -> Result<()> {
     vote.commitment = commitment;
     vote.is_revealed = false;
     vote.bump = ctx.bumps.vote_commitment;
+
+    emit!(VoteCast {
+        proposal: ctx.accounts.proposal.key(),
+        voter: ctx.accounts.voter.key(),
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

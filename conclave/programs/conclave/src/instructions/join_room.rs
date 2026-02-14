@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{TokenAccount, TokenInterface};
 use crate::state::{DaoRoom, Member};
 use crate::errors::ConclaveError;
+use crate::events::MemberJoined;
 
 #[derive(Accounts)]
 pub struct JoinRoom<'info> {
@@ -37,15 +38,23 @@ pub fn handler(ctx: Context<JoinRoom>, encrypted_group_key: Vec<u8>) -> Result<(
         ConclaveError::EncryptedKeyTooLong
     );
 
+    let clock = Clock::get()?;
     let member = &mut ctx.accounts.member;
     member.wallet = ctx.accounts.wallet.key();
     member.room = ctx.accounts.room.key();
     member.encrypted_group_key = encrypted_group_key;
-    member.joined_at = Clock::get()?.unix_timestamp;
+    member.joined_at = clock.unix_timestamp;
     member.bump = ctx.bumps.member;
 
     let room = &mut ctx.accounts.room;
     room.member_count = room.member_count.checked_add(1).unwrap();
+
+    emit!(MemberJoined {
+        room: room.key(),
+        wallet: ctx.accounts.wallet.key(),
+        member_count: room.member_count,
+        timestamp: clock.unix_timestamp,
+    });
 
     Ok(())
 }

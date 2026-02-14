@@ -4,6 +4,10 @@ pub mod create_proposal;
 pub mod cast_vote;
 pub mod reveal_vote;
 pub mod send_message;
+pub mod finalize_proposal;
+pub mod close_message;
+pub mod close_vote;
+pub mod update_member_key;
 
 pub use create_room::CreateRoom;
 pub use join_room::JoinRoom;
@@ -11,3 +15,7 @@ pub use create_proposal::CreateProposal;
 pub use cast_vote::CastVote;
 pub use reveal_vote::RevealVote;
 pub use send_message::SendMessage;
+pub use finalize_proposal::FinalizeProposal;
+pub use close_message::CloseMessage;
+pub use close_vote::CloseVote;
+pub use update_member_key::UpdateMemberKey;

@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::state::{DaoRoom, Member, Message};
 use crate::errors::ConclaveError;
+use crate::events::MessageSent;
 
 #[derive(Accounts)]
 #[instruction(ciphertext: Vec<u8>, timestamp: i64)]
@@ -40,6 +41,13 @@ pub fn handler(ctx: Context<SendMessage>, ciphertext: Vec<u8>, timestamp: i64) -
     message.ciphertext = ciphertext;
     message.timestamp = timestamp;
     message.bump = ctx.bumps.message;
+
+    emit!(MessageSent {
+        room: ctx.accounts.room.key(),
+        sender: ctx.accounts.sender.key(),
+        message: message.key(),
+        timestamp,
+    });
 
     Ok(())
 }

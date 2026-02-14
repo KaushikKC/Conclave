@@ -28,4 +28,14 @@ pub enum ConclaveError {
     EncryptedKeyTooLong,
     #[msg("Deadline must be in the future")]
     DeadlineInPast,
+    #[msg("Proposal has already been finalized")]
+    AlreadyFinalized,
+    #[msg("Proposal is not finalized yet")]
+    NotFinalized,
+    #[msg("Only the room authority can perform this action")]
+    UnauthorizedAuthority,
+    #[msg("Only the message sender can close this message")]
+    UnauthorizedSender,
+    #[msg("Vote commitment must be revealed before closing")]
+    VoteNotRevealed,
 }
