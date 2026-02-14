@@ -2,27 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&display=swap');
+
 :root {
-  --conclave-bg: #0f1419;
-  --conclave-card: #1a2332;
-  --conclave-border: #2d3a4f;
-  --conclave-accent: #00d4aa;
-  --conclave-muted: #6b7c93;
+  --conclave-dark: #0D0D0D;
+  --conclave-text: #EDE0D4;
+  --conclave-accent: #FF4D8D;
+  /* Defaulting to pink as main accent */
 }
 
 body {
-  @apply bg-conclave-dark text-gray-100 antialiased;
+  @apply bg-conclave-dark text-conclave-text antialiased;
+  font-family: 'Outfit', sans-serif;
   min-height: 100vh;
+  /* Distinct Grid Pattern */
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 60px 60px;
+  background-attachment: fixed;
+}
+
+/* Grainy texture overlay */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 50;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+/* Inner glow for viewport */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  box-shadow: inset 0 0 100px rgba(0, 184, 241, 0.1);
+}
+
+/* Wallet Adapter Overrides */
+.wallet-adapter-button-trigger {
+  border-radius: 9999px !important;
+  padding: 0 1.5rem !important;
+  height: auto !important;
+  min-height: 40px !important;
+  background-color: transparent !important;
+  /* Transparent for grid look */
+  color: var(--conclave-text) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  white-space: nowrap !important;
+  font-size: 0.75rem !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.wallet-adapter-button-trigger:hover {
+  background-color: white !important;
+  transform: scale(1.05) !important;
 }
 
 @layer components {
+
+  /* MagnetLover style buttons: Pill shaped, bold, uppercase tracking */
   .btn-primary {
-    @apply rounded-lg bg-conclave-accent px-4 py-2 font-medium text-conclave-dark transition hover:opacity-90;
+    @apply relative overflow-hidden rounded-full bg-conclave-text px-8 py-4 font-bold uppercase tracking-widest text-conclave-dark transition-transform hover:scale-105 hover:bg-white;
+    font-family: 'Outfit', sans-serif;
   }
+
   .btn-secondary {
-    @apply rounded-lg border border-conclave-border bg-conclave-card px-4 py-2 font-medium transition hover:border-conclave-accent/50;
+    @apply rounded-full border border-conclave-text/30 bg-transparent px-8 py-4 font-bold uppercase tracking-widest text-conclave-text transition-all hover:border-conclave-text hover:bg-conclave-text/10;
+    font-family: 'Outfit', sans-serif;
   }
+
   .card {
-    @apply rounded-xl border border-conclave-border bg-conclave-card p-6;
+    @apply rounded-3xl border border-conclave-border bg-conclave-card/50 p-8 backdrop-blur-md;
+  }
+
+  /* Text styles */
+  .heading-hero {
+    @apply font-black uppercase tracking-tighter;
+    font-family: 'Outfit', sans-serif;
+    font-size: clamp(3rem, 8vw, 6rem);
+    line-height: 0.9;
+  }
+
+  .nav-link {
+    @apply text-sm font-medium uppercase tracking-widest text-conclave-text/70 transition-colors hover:text-conclave-text;
+    font-family: 'Outfit', sans-serif;
   }
 }
