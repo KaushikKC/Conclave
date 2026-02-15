@@ -3,13 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getRoomPda, getMemberPda } from "../../lib/conclave";
 import { generateGroupKey } from "../../app/sdk/crypto";
-import { postGroupKey } from "../../lib/api";
+import { postGroupKeyWithRetry } from "../../lib/api";
 
 const MAX_NAME_LEN = 50;
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
@@ -17,6 +21,7 @@ const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 export default function CreateRoomPage() {
   const router = useRouter();
   const { publicKey: wallet, connected } = useWallet();
+  const { connection } = useConnection();
   const { program } = useConclaveProgram();
   const [name, setName] = useState("");
   const [governanceMintStr, setGovernanceMintStr] = useState("");
@@ -54,7 +59,7 @@ export default function CreateRoomPage() {
 
       // 1. Create the room
       setStatus("Creating room…");
-      await program.methods
+      const sig = await program.methods
         .createRoom(trimmed)
         .accountsPartial({
           authority: wallet,
@@ -65,27 +70,30 @@ export default function CreateRoomPage() {
         })
         .rpc();
 
-      // 2. Generate group key
-      const groupKey = generateGroupKey();
-      const groupKeyBase64 = btoa(
-        String.fromCharCode(...groupKey),
-      );
+      // 2. Wait for tx confirmation before posting key
+      setStatus("Confirming transaction…");
+      await connection.confirmTransaction(sig, "confirmed");
 
-      // 3. Store in localStorage
+      // 3. Generate group key
+      const groupKey = generateGroupKey();
+      const groupKeyBase64 = btoa(String.fromCharCode(...groupKey));
+
+      // 4. Store in localStorage
       localStorage.setItem(
         GROUP_KEY_STORAGE_PREFIX + roomPda.toBase58(),
         JSON.stringify(Array.from(groupKey)),
       );
 
-      // 4. Post to indexer
+      // 5. Auto-publish room key to indexer with retries (handles devnet propagation delay)
       setStatus("Saving group key…");
       try {
-        await postGroupKey(roomPda.toBase58(), groupKeyBase64);
-      } catch {
-        // Non-fatal — key is in localStorage, indexer might not be running
+        await postGroupKeyWithRetry(roomPda.toBase58(), groupKeyBase64);
+      } catch (err) {
+        console.warn("Failed to publish group key after retries:", err);
+        setError("Room created, but key publish failed. It will auto-retry when you visit the room.");
       }
 
-      // 5. Auto-join the room
+      // 6. Auto-join the room
       setStatus("Joining room…");
       try {
         const memberPda = getMemberPda(roomPda, wallet, program.programId);
@@ -93,6 +101,20 @@ export default function CreateRoomPage() {
           governanceMint,
           wallet,
         );
+
+        // Create the ATA if it doesn't exist
+        const preInstructions = [];
+        const ataInfo = await connection.getAccountInfo(tokenAccount);
+        if (!ataInfo) {
+          preInstructions.push(
+            createAssociatedTokenAccountInstruction(
+              wallet,
+              tokenAccount,
+              wallet,
+              governanceMint,
+            ),
+          );
+        }
 
         await program.methods
           .joinRoom(Array.from(groupKey))
@@ -104,12 +126,13 @@ export default function CreateRoomPage() {
             tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: SystemProgram.programId,
           })
+          .preInstructions(preInstructions)
           .rpc();
       } catch {
         // Non-fatal — user can join from room page
       }
 
-      // 6. Redirect
+      // 7. Redirect
       router.push(`/rooms/${roomPda.toBase58()}`);
     } catch (err: any) {
       setError(err?.message || err?.toString?.() || "Transaction failed.");

@@ -4,8 +4,13 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import {
+  getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getMemberPda } from "../../lib/conclave";
 import ChatRoom from "../../components/ChatRoom";
@@ -15,6 +20,8 @@ import {
   fetchRoomMembers,
   fetchRoomProposals,
   fetchGroupKey as fetchGroupKeyFromApi,
+  postGroupKey,
+  postGroupKeyWithRetry,
   ApiProposal,
 } from "../../lib/api";
 
@@ -34,6 +41,7 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const { roomPda: roomPdaStr } = router.query;
   const { publicKey: wallet, connected } = useWallet();
+  const { connection } = useConnection();
   const { program } = useConclaveProgram();
   const [room, setRoom] = useState<RoomData | null>(null);
   const [isMember, setIsMember] = useState(false);
@@ -42,10 +50,13 @@ export default function RoomDetailPage() {
   const [joinError, setJoinError] = useState("");
   const [tab, setTab] = useState<Tab>("chat");
   const [groupKey, setGroupKey] = useState<Uint8Array | null>(null);
+  const [publishKeyLoading, setPublishKeyLoading] = useState(false);
+  const [publishKeyDone, setPublishKeyDone] = useState(false);
 
   const roomPda = typeof roomPdaStr === "string" ? roomPdaStr : null;
+  const { programReadOnly } = useConclaveProgram();
 
-  // Fetch room data from indexer
+  // Fetch room data from indexer, fallback to chain if 404 (e.g. right after create)
   useEffect(() => {
     if (!roomPda) return;
     let cancelled = false;
@@ -61,7 +72,30 @@ export default function RoomDetailPage() {
           proposalCount: data.proposal_count,
         });
       } catch {
-        if (!cancelled) setRoom(null);
+        if (cancelled) {
+          setLoading(false);
+          return;
+        }
+        // Indexer 404 (e.g. room just created): fetch from chain
+        if (programReadOnly) {
+          try {
+            const acc = await (programReadOnly.account as any).daoRoom.fetch(
+              new PublicKey(roomPda),
+            );
+            if (cancelled) return;
+            setRoom({
+              name: acc.name,
+              authority: acc.authority.toBase58(),
+              governanceMint: acc.governanceMint.toBase58(),
+              memberCount: acc.memberCount,
+              proposalCount: acc.proposalCount,
+            });
+          } catch {
+            if (!cancelled) setRoom(null);
+          }
+        } else {
+          setRoom(null);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -69,9 +103,9 @@ export default function RoomDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [roomPda]);
+  }, [roomPda, programReadOnly]);
 
-  // Check membership from indexer
+  // Check membership from indexer, fallback to chain if not found
   useEffect(() => {
     if (!roomPda || !wallet) return;
     let cancelled = false;
@@ -79,44 +113,82 @@ export default function RoomDetailPage() {
       try {
         const members = await fetchRoomMembers(roomPda);
         const found = members.some((m) => m.wallet === wallet.toBase58());
-        if (!cancelled) setIsMember(found);
-      } catch {
+        if (!cancelled) {
+          if (found) {
+            setIsMember(true);
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback: check member PDA on-chain directly
+      if (programReadOnly && !cancelled) {
+        try {
+          const roomPubkey = new PublicKey(roomPda);
+          const memberPda = getMemberPda(roomPubkey, wallet, programReadOnly.programId);
+          const acc = await connection.getAccountInfo(memberPda);
+          if (!cancelled) setIsMember(!!acc);
+        } catch {
+          if (!cancelled) setIsMember(false);
+        }
+      } else {
         if (!cancelled) setIsMember(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [roomPda, wallet]);
+  }, [roomPda, wallet, programReadOnly, connection]);
 
-  // Load group key from localStorage, or fetch from indexer
+  // Load group key from localStorage, or fetch from indexer.
+  // If creator has key locally but indexer doesn't, auto-republish it.
   useEffect(() => {
     if (!roomPda) return;
+    let cancelled = false;
     (async () => {
+      let localKey: Uint8Array | null = null;
+
       // Try localStorage first
       try {
         const raw = localStorage.getItem(GROUP_KEY_STORAGE_PREFIX + roomPda);
         if (raw) {
           const arr = JSON.parse(raw) as number[];
-          setGroupKey(new Uint8Array(arr));
-          return;
+          localKey = new Uint8Array(arr);
+          if (!cancelled) setGroupKey(localKey);
         }
       } catch {}
 
       // Fetch from indexer
+      let indexerHasKey = false;
       try {
         const keyBase64 = await fetchGroupKeyFromApi(roomPda);
         if (keyBase64) {
+          indexerHasKey = true;
           const arr = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
           localStorage.setItem(
             GROUP_KEY_STORAGE_PREFIX + roomPda,
             JSON.stringify(Array.from(arr)),
           );
-          setGroupKey(arr);
+          if (!cancelled) setGroupKey(arr);
         }
       } catch {}
+
+      // Auto-republish: if we have the key locally but indexer doesn't,
+      // and the current wallet is the room authority, push it in the background
+      if (localKey && !indexerHasKey && !cancelled && room && wallet) {
+        const isCreator = room.authority === wallet.toBase58();
+        if (isCreator) {
+          const b64 = btoa(String.fromCharCode(...localKey));
+          postGroupKeyWithRetry(roomPda, b64).then(() => {
+            if (!cancelled) setPublishKeyDone(true);
+          }).catch((err) => {
+            console.warn("Auto-republish group key failed:", err);
+          });
+        }
+      }
     })();
-  }, [roomPda]);
+    return () => { cancelled = true; };
+  }, [roomPda, room, wallet]);
 
   const handleJoin = async () => {
     if (!program || !wallet || !roomPda || !room) return;
@@ -124,15 +196,39 @@ export default function RoomDetailPage() {
     setJoinLoading(true);
     setJoinError("");
     try {
-      // Fetch group key from indexer
+      // Prefer key from indexer; if unavailable, creator can use key from localStorage (saved when they created the room)
       let keyBytes: Uint8Array;
       const keyBase64 = await fetchGroupKeyFromApi(roomPda);
       if (keyBase64) {
         keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
       } else {
-        // Fallback: zero key (shouldn't happen if room was created properly)
-        keyBytes = new Uint8Array(32);
+        const isCreator = room.authority === wallet.toBase58();
+        const localKey = localStorage.getItem(
+          GROUP_KEY_STORAGE_PREFIX + roomPda,
+        );
+        if (isCreator && localKey) {
+          try {
+            const arr = JSON.parse(localKey) as number[];
+            keyBytes = new Uint8Array(arr);
+          } catch {
+            setJoinError(
+              "Could not use saved key. Start the indexer (cd indexer && npm run dev) or create the room again from this browser.",
+            );
+            return;
+          }
+        } else {
+          setJoinError(
+            "Room key not available (indexer may be stopped: run cd indexer && npm run dev). If you're the room creator on this browser, the key is saved — try joining again.",
+          );
+          return;
+        }
       }
+
+      // Anchor expects bytes as Buffer or Uint8Array
+      const keyForInstruction =
+        typeof Buffer !== "undefined"
+          ? Buffer.from(keyBytes)
+          : new Uint8Array(keyBytes);
 
       const roomPubkey = new PublicKey(roomPda);
       const memberPda = getMemberPda(roomPubkey, wallet, program.programId);
@@ -142,8 +238,22 @@ export default function RoomDetailPage() {
         wallet,
       );
 
+      // Create the ATA if it doesn't exist (e.g. wallet never held this token)
+      const preInstructions = [];
+      const ataInfo = await connection.getAccountInfo(tokenAccount);
+      if (!ataInfo) {
+        preInstructions.push(
+          createAssociatedTokenAccountInstruction(
+            wallet,
+            tokenAccount,
+            wallet,
+            governanceMint,
+          ),
+        );
+      }
+
       await program.methods
-        .joinRoom(Array.from(keyBytes))
+        .joinRoom(keyForInstruction)
         .accountsPartial({
           wallet,
           room: roomPubkey,
@@ -152,9 +262,9 @@ export default function RoomDetailPage() {
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions(preInstructions)
         .rpc();
 
-      // Store group key locally
       localStorage.setItem(
         GROUP_KEY_STORAGE_PREFIX + roomPda,
         JSON.stringify(Array.from(keyBytes)),
@@ -251,6 +361,22 @@ export default function RoomDetailPage() {
     );
   }
 
+  const isAuthority = room && wallet && room.authority === wallet.toBase58();
+
+  const handlePublishKey = async () => {
+    if (!roomPda || !groupKey) return;
+    setPublishKeyLoading(true);
+    try {
+      const b64 = btoa(String.fromCharCode(...groupKey));
+      await postGroupKey(roomPda, b64);
+      setPublishKeyDone(true);
+    } catch {
+      // ignore
+    } finally {
+      setPublishKeyLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <Link
@@ -260,6 +386,35 @@ export default function RoomDetailPage() {
         ← Rooms
       </Link>
       <h1 className="text-2xl font-bold text-white mb-6">{room.name}</h1>
+
+      {isAuthority && groupKey && (
+        <div className="mb-4 p-3 rounded-lg bg-conclave-card border border-conclave-border text-sm text-conclave-muted">
+          {publishKeyDone ? (
+            <span className="text-green-400">
+              Room key saved to server. Others can join.
+            </span>
+          ) : (
+            <>
+              The room key is usually saved automatically when you create a room
+              (if the indexer is running). If someone couldn’t join, start the
+              indexer (
+              <code className="text-xs bg-conclave-dark px-1 rounded">
+                cd indexer && npm run dev
+              </code>
+              ) and{" "}
+              <button
+                type="button"
+                onClick={handlePublishKey}
+                disabled={publishKeyLoading}
+                className="text-conclave-accent hover:underline disabled:opacity-50"
+              >
+                {publishKeyLoading ? "Publishing…" : "save the key now"}
+              </button>
+              .
+            </>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2 border-b border-conclave-border mb-6">
         {(["chat", "proposals", "members"] as const).map((t) => (

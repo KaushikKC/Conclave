@@ -7,7 +7,9 @@ import fs from "fs";
 
 // --- Config ---
 
-const PROGRAM_ID = new PublicKey("E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU");
+const PROGRAM_ID = new PublicKey(
+  "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU",
+);
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const WS_URL = process.env.WS_URL || "wss://api.devnet.solana.com";
 const PORT = parseInt(process.env.PORT || "3001");
@@ -91,8 +93,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS group_keys (
     room TEXT PRIMARY KEY,
     group_key TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    FOREIGN KEY (room) REFERENCES rooms(address)
+    created_at INTEGER NOT NULL
   );
 `);
 
@@ -129,12 +130,15 @@ const insertEvent = db.prepare(`
 `);
 
 const deleteMessage = db.prepare(`DELETE FROM messages WHERE address = ?`);
-const deleteVoteCommitment = db.prepare(`DELETE FROM vote_commitments WHERE address = ?`);
+const deleteVoteCommitment = db.prepare(
+  `DELETE FROM vote_commitments WHERE address = ?`,
+);
 
 // --- IDL Loading ---
 
 const idlPath = path.join(__dirname, "..", "target", "idl", "conclave.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
+const accountsCoder = new anchor.BorshAccountsCoder(idl);
 
 // --- Account Polling ---
 
@@ -147,19 +151,49 @@ async function indexAllAccounts() {
   console.log("Indexing all program accounts...");
   const now = Math.floor(Date.now() / 1000);
 
-  const coder = new anchor.BorshAccountsCoder(idl);
-
   const accounts = await connection.getProgramAccounts(PROGRAM_ID);
   console.log(`Found ${accounts.length} accounts`);
+
+  // First pass: decode and collect by type so we insert in FK order (rooms → members → proposals → messages → vote_commitments)
+  type RoomRow = [
+    string,
+    string,
+    string,
+    string,
+    number,
+    number,
+    number,
+    number,
+  ];
+  type MemberRow = [string, string, string, number, number];
+  type ProposalRow = [
+    string,
+    string,
+    string,
+    string,
+    string,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  type MessageRow = [string, string, string, string, number, number];
+  type VoteRow = [string, string, string, number, number];
+
+  const rooms: RoomRow[] = [];
+  const members: MemberRow[] = [];
+  const proposals: ProposalRow[] = [];
+  const messages: MessageRow[] = [];
+  const voteCommitments: VoteRow[] = [];
 
   for (const { pubkey, account } of accounts) {
     const address = pubkey.toBase58();
     const data = account.data;
 
-    // Try each account type by discriminator
     try {
-      const decoded = coder.decode("DaoRoom", data);
-      upsertRoom.run(
+      const decoded = accountsCoder.decode("DaoRoom", data);
+      rooms.push([
         address,
         decoded.authority.toBase58(),
         decoded.governanceMint.toBase58(),
@@ -167,26 +201,26 @@ async function indexAllAccounts() {
         decoded.memberCount,
         decoded.proposalCount,
         decoded.createdAt.toNumber(),
-        now
-      );
+        now,
+      ]);
       continue;
     } catch {}
 
     try {
-      const decoded = coder.decode("Member", data);
-      upsertMember.run(
+      const decoded = accountsCoder.decode("Member", data);
+      members.push([
         address,
         decoded.wallet.toBase58(),
         decoded.room.toBase58(),
         decoded.joinedAt.toNumber(),
-        now
-      );
+        now,
+      ]);
       continue;
     } catch {}
 
     try {
-      const decoded = coder.decode("Proposal", data);
-      upsertProposal.run(
+      const decoded = accountsCoder.decode("Proposal", data);
+      proposals.push([
         address,
         decoded.room.toBase58(),
         decoded.creator.toBase58(),
@@ -196,38 +230,103 @@ async function indexAllAccounts() {
         decoded.voteNoCount,
         decoded.deadline.toNumber(),
         decoded.isFinalized ? 1 : 0,
-        now
-      );
+        now,
+      ]);
       continue;
     } catch {}
 
     try {
-      const decoded = coder.decode("Message", data);
-      upsertMessage.run(
+      const decoded = accountsCoder.decode("Message", data);
+      messages.push([
         address,
         decoded.room.toBase58(),
         decoded.sender.toBase58(),
         Buffer.from(decoded.ciphertext).toString("base64"),
         decoded.timestamp.toNumber(),
-        now
-      );
+        now,
+      ]);
       continue;
     } catch {}
 
     try {
-      const decoded = coder.decode("VoteCommitment", data);
-      upsertVoteCommitment.run(
+      const decoded = accountsCoder.decode("VoteCommitment", data);
+      voteCommitments.push([
         address,
         decoded.voter.toBase58(),
         decoded.proposal.toBase58(),
         decoded.isRevealed ? 1 : 0,
-        now
-      );
+        now,
+      ]);
       continue;
     } catch {}
   }
 
+  // Build sets of valid FK targets (this batch + already in DB) so we never insert orphans
+  const validRooms = new Set<string>(rooms.map((r) => r[0]));
+  (
+    db.prepare("SELECT address FROM rooms").all() as { address: string }[]
+  ).forEach((r) => validRooms.add(r.address));
+  const validProposals = new Set<string>(proposals.map((p) => p[0]));
+  (
+    db.prepare("SELECT address FROM proposals").all() as { address: string }[]
+  ).forEach((p) => validProposals.add(p.address));
+
+  const membersOk = members.filter((m) => validRooms.has(m[2]));
+  const proposalsOk = proposals.filter((p) => validRooms.has(p[1]));
+  const messagesOk = messages.filter((m) => validRooms.has(m[1]));
+  const voteCommitmentsOk = voteCommitments.filter((v) =>
+    validProposals.has(v[2]),
+  );
+
+  if (
+    membersOk.length < members.length ||
+    proposalsOk.length < proposals.length ||
+    messagesOk.length < messages.length ||
+    voteCommitmentsOk.length < voteCommitments.length
+  ) {
+    console.warn("Skipped some rows (missing FK):", {
+      members: members.length - membersOk.length,
+      proposals: proposals.length - proposalsOk.length,
+      messages: messages.length - messagesOk.length,
+      votes: voteCommitments.length - voteCommitmentsOk.length,
+    });
+  }
+
+  // Second pass: insert in dependency order to satisfy FOREIGN KEYs
+  for (const row of rooms) upsertRoom.run(...row);
+  for (const row of membersOk) upsertMember.run(...row);
+  for (const row of proposalsOk) upsertProposal.run(...row);
+  for (const row of messagesOk) upsertMessage.run(...row);
+  for (const row of voteCommitmentsOk) upsertVoteCommitment.run(...row);
+
   console.log("Indexing complete");
+}
+
+/** Fetch a single room from chain and insert into DB if missing (so group_keys FK is satisfied). */
+async function ensureRoomInDb(roomAddress: string): Promise<boolean> {
+  if (db.prepare("SELECT 1 FROM rooms WHERE address = ?").get(roomAddress)) {
+    return true;
+  }
+  try {
+    const pubkey = new PublicKey(roomAddress);
+    const accountInfo = await connection.getAccountInfo(pubkey);
+    if (!accountInfo || !accountInfo.data.length) return false;
+    const decoded = accountsCoder.decode("DaoRoom", accountInfo.data);
+    const now = Math.floor(Date.now() / 1000);
+    upsertRoom.run(
+      roomAddress,
+      decoded.authority.toBase58(),
+      decoded.governanceMint.toBase58(),
+      decoded.name,
+      decoded.memberCount,
+      decoded.proposalCount,
+      decoded.createdAt.toNumber(),
+      now,
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // --- Log Subscription (Real-time) ---
@@ -235,30 +334,34 @@ async function indexAllAccounts() {
 function subscribeToLogs() {
   console.log("Subscribing to program logs...");
 
-  connection.onLogs(PROGRAM_ID, async (logs) => {
-    const { signature, logs: logMessages } = logs;
+  connection.onLogs(
+    PROGRAM_ID,
+    async (logs) => {
+      const { signature, logs: logMessages } = logs;
 
-    for (const log of logMessages) {
-      if (log.startsWith("Program data:")) {
-        const eventData = log.replace("Program data: ", "");
-        const slot = 0; // We'd need to fetch the tx for the actual slot
-        const now = Math.floor(Date.now() / 1000);
+      for (const log of logMessages) {
+        if (log.startsWith("Program data:")) {
+          const eventData = log.replace("Program data: ", "");
+          const slot = 0; // We'd need to fetch the tx for the actual slot
+          const now = Math.floor(Date.now() / 1000);
 
-        // Parse event type from the base64 data
-        const decoded = Buffer.from(eventData, "base64");
-        const discriminator = decoded.slice(0, 8).toString("hex");
+          // Parse event type from the base64 data
+          const decoded = Buffer.from(eventData, "base64");
+          const discriminator = decoded.slice(0, 8).toString("hex");
 
-        let eventType = "unknown";
-        // Event discriminators are sha256("event:<EventName>")[0..8]
-        // We store raw and let consumers filter
-        insertEvent.run(eventType, eventData, signature, slot, now);
+          let eventType = "unknown";
+          // Event discriminators are sha256("event:<EventName>")[0..8]
+          // We store raw and let consumers filter
+          insertEvent.run(eventType, eventData, signature, slot, now);
+        }
       }
-    }
 
-    // Re-index affected accounts after any transaction
-    // In production, you'd parse the tx to know which accounts changed
-    // For hackathon, we do a lightweight re-index every N seconds
-  }, "confirmed");
+      // Re-index affected accounts after any transaction
+      // In production, you'd parse the tx to know which accounts changed
+      // For hackathon, we do a lightweight re-index every N seconds
+    },
+    "confirmed",
+  );
 }
 
 // Periodic re-index to catch any missed updates
@@ -286,42 +389,55 @@ app.options("*", (_req, res) => res.sendStatus(204));
 
 // GET /rooms
 app.get("/rooms", (_req, res) => {
-  const rooms = db.prepare("SELECT * FROM rooms ORDER BY created_at DESC").all();
+  const rooms = db
+    .prepare("SELECT * FROM rooms ORDER BY created_at DESC")
+    .all();
   res.json(rooms);
 });
 
 // GET /rooms/:address
 app.get("/rooms/:address", (req, res) => {
-  const room = db.prepare("SELECT * FROM rooms WHERE address = ?").get(req.params.address);
+  const room = db
+    .prepare("SELECT * FROM rooms WHERE address = ?")
+    .get(req.params.address);
   if (!room) return res.status(404).json({ error: "Room not found" });
   res.json(room);
 });
 
 // GET /rooms/:address/members
 app.get("/rooms/:address/members", (req, res) => {
-  const members = db.prepare("SELECT * FROM members WHERE room = ? ORDER BY joined_at ASC").all(req.params.address);
+  const members = db
+    .prepare("SELECT * FROM members WHERE room = ? ORDER BY joined_at ASC")
+    .all(req.params.address);
   res.json(members);
 });
 
 // GET /rooms/:address/messages
 app.get("/rooms/:address/messages", (req, res) => {
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
-  const before = parseInt(req.query.before as string) || Math.floor(Date.now() / 1000) + 1;
+  const before =
+    parseInt(req.query.before as string) || Math.floor(Date.now() / 1000) + 1;
   const messages = db
-    .prepare("SELECT * FROM messages WHERE room = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?")
+    .prepare(
+      "SELECT * FROM messages WHERE room = ? AND timestamp < ? ORDER BY timestamp DESC LIMIT ?",
+    )
     .all(req.params.address, before, limit);
   res.json(messages);
 });
 
 // GET /rooms/:address/proposals
 app.get("/rooms/:address/proposals", (req, res) => {
-  const proposals = db.prepare("SELECT * FROM proposals WHERE room = ? ORDER BY deadline DESC").all(req.params.address);
+  const proposals = db
+    .prepare("SELECT * FROM proposals WHERE room = ? ORDER BY deadline DESC")
+    .all(req.params.address);
   res.json(proposals);
 });
 
 // GET /proposals/:address
 app.get("/proposals/:address", (req, res) => {
-  const proposal = db.prepare("SELECT * FROM proposals WHERE address = ?").get(req.params.address);
+  const proposal = db
+    .prepare("SELECT * FROM proposals WHERE address = ?")
+    .get(req.params.address);
   if (!proposal) return res.status(404).json({ error: "Proposal not found" });
   res.json(proposal);
 });
@@ -337,12 +453,14 @@ app.get("/proposals/:address/votes", (req, res) => {
 // GET /members/:wallet/rooms
 app.get("/members/:wallet/rooms", (req, res) => {
   const memberships = db
-    .prepare(`
+    .prepare(
+      `
       SELECT r.* FROM rooms r
       INNER JOIN members m ON m.room = r.address
       WHERE m.wallet = ?
       ORDER BY r.created_at DESC
-    `)
+    `,
+    )
     .all(req.params.wallet);
   res.json(memberships);
 });
@@ -357,15 +475,20 @@ app.get("/events", (req, res) => {
 });
 
 // POST /rooms/:address/key
-app.post("/rooms/:address/key", (req, res) => {
+app.post("/rooms/:address/key", async (req, res) => {
   const { groupKey } = req.body;
   if (!groupKey || typeof groupKey !== "string") {
     return res.status(400).json({ error: "groupKey (base64 string) required" });
   }
+  const roomAddress = req.params.address;
   const now = Math.floor(Date.now() / 1000);
+
+  // Store key immediately — no need to wait for the room to be indexed.
+  // The room will appear on the next poll cycle; the key is stored independently.
   db.prepare(
     "INSERT OR REPLACE INTO group_keys (room, group_key, created_at) VALUES (?, ?, ?)",
-  ).run(req.params.address, groupKey, now);
+  ).run(roomAddress, groupKey, now);
+  console.log(`Stored group key for room ${roomAddress}`);
   res.json({ ok: true });
 });
 
@@ -380,7 +503,9 @@ app.get("/rooms/:address/key", (req, res) => {
 
 // GET /health
 app.get("/health", (_req, res) => {
-  const roomCount = db.prepare("SELECT COUNT(*) as count FROM rooms").get() as any;
+  const roomCount = db
+    .prepare("SELECT COUNT(*) as count FROM rooms")
+    .get() as any;
   res.json({
     status: "ok",
     rooms: roomCount.count,

@@ -124,3 +124,25 @@ export async function postGroupKey(
   });
   if (!res.ok) throw new Error(`Failed to post group key: ${res.status}`);
 }
+
+export async function postGroupKeyWithRetry(
+  roomAddress: string,
+  groupKeyBase64: string,
+  maxRetries = 5,
+  delayMs = 3000,
+): Promise<void> {
+  let lastError: Error | undefined;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      await postGroupKey(roomAddress, groupKeyBase64);
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < maxRetries) {
+        const backoff = delayMs * Math.pow(2, attempt);
+        await new Promise((r) => setTimeout(r, backoff));
+      }
+    }
+  }
+  throw lastError;
+}

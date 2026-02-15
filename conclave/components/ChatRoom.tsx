@@ -31,6 +31,11 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const pendingSentRef = useRef<{
+    sender: string;
+    timestamp: number;
+    text: string;
+  } | null>(null);
 
   const loadMessages = useCallback(async () => {
     if (!roomPda) return;
@@ -53,7 +58,6 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
       const decrypted: DecryptedMessage[] = [];
       for (const m of sorted) {
         try {
-          // Indexer stores ciphertext as base64
           const ct = Uint8Array.from(atob(m.ciphertext), (c) =>
             c.charCodeAt(0),
           );
@@ -73,6 +77,25 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
           });
         }
       }
+
+      // Keep optimistic message visible until it appears from the indexer (stops "message disappears" after poll)
+      const pending = pendingSentRef.current;
+      if (pending) {
+        const found = decrypted.some(
+          (d) =>
+            d.sender === pending.sender && d.timestamp === pending.timestamp,
+        );
+        if (found) pendingSentRef.current = null;
+        else
+          decrypted.push({
+            publicKey: "",
+            sender: pending.sender,
+            text: pending.text,
+            timestamp: pending.timestamp,
+          });
+        decrypted.sort((a, b) => a.timestamp - b.timestamp);
+      }
+
       setMessages(decrypted);
     } catch (e: any) {
       setError(e?.message || "Failed to load messages");
@@ -115,8 +138,13 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         timestamp,
         program.programId,
       );
+      // Pass ciphertext as Buffer/Uint8Array so Anchor encodes bytes correctly (avoids Blob.encode length errors)
+      const ciphertextBuf =
+        typeof Buffer !== "undefined"
+          ? Buffer.from(ciphertext)
+          : new Uint8Array(ciphertext);
       await program.methods
-        .sendMessage(Array.from(ciphertext), new anchor.BN(timestamp))
+        .sendMessage(ciphertextBuf, new anchor.BN(timestamp))
         .accountsPartial({
           sender: wallet.publicKey,
           room: roomPda,
@@ -125,6 +153,11 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         })
         .rpc();
       setInput("");
+      pendingSentRef.current = {
+        sender: wallet.publicKey!.toBase58(),
+        timestamp,
+        text: plaintext,
+      };
       setMessages((prev) => [
         ...prev,
         {
