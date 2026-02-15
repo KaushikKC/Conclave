@@ -7,6 +7,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { useConclaveProgram } from "../../../../hooks/useConclaveProgram";
 import { getMemberPda, getVoteCommitmentPda } from "../../../../lib/conclave";
 import { createVoteCommitment } from "../../../../app/sdk/crypto";
+import { fetchProposal, fetchProposalVotes } from "../../../../lib/api";
 
 const VOTE_STORAGE_PREFIX = "conclave_vote_";
 
@@ -24,7 +25,7 @@ interface ProposalData {
 export default function ProposalDetailPage() {
   const router = useRouter();
   const { roomPda: roomPdaStr, proposalPda: proposalPdaStr } = router.query;
-  const { program, programReadOnly, wallet } = useConclaveProgram();
+  const { program, wallet } = useConclaveProgram();
   const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [voteStatus, setVoteStatus] = useState<
@@ -39,24 +40,21 @@ export default function ProposalDetailPage() {
     typeof proposalPdaStr === "string" ? proposalPdaStr : null;
 
   useEffect(() => {
-    if (!programReadOnly || !proposalPda) return;
+    if (!proposalPda) return;
     let cancelled = false;
     (async () => {
       try {
-        const pubkey = new PublicKey(proposalPda);
-        const acc = await (programReadOnly.account as any).proposal.fetch(
-          pubkey,
-        );
+        const data = await fetchProposal(proposalPda);
         if (cancelled) return;
         setProposal({
-          room: acc.room.toBase58(),
-          creator: acc.creator.toBase58(),
-          title: acc.title,
-          description: acc.description,
-          voteYesCount: acc.voteYesCount ?? 0,
-          voteNoCount: acc.voteNoCount ?? 0,
-          deadline: Number(acc.deadline ?? 0),
-          isFinalized: acc.isFinalized ?? false,
+          room: data.room,
+          creator: data.creator,
+          title: data.title,
+          description: data.description,
+          voteYesCount: data.vote_yes_count,
+          voteNoCount: data.vote_no_count,
+          deadline: data.deadline,
+          isFinalized: data.is_finalized === 1,
         });
       } catch {
         if (!cancelled) setProposal(null);
@@ -67,25 +65,21 @@ export default function ProposalDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [programReadOnly, proposalPda]);
+  }, [proposalPda]);
 
   useEffect(() => {
     const pubkey = wallet?.publicKey ?? null;
-    if (!programReadOnly || !proposalPda || !pubkey) return;
+    if (!proposalPda || !pubkey) return;
     let cancelled = false;
     (async () => {
       try {
-        const proposalPubkey = new PublicKey(proposalPda);
-        const votePda = getVoteCommitmentPda(
-          proposalPubkey,
-          pubkey,
-          programReadOnly.programId,
-        );
-        const acc = await (programReadOnly.account as any).voteCommitment.fetch(
-          votePda,
-        );
-        if (!cancelled)
-          setVoteStatus(acc.isRevealed ? "revealed" : "committed");
+        const votes = await fetchProposalVotes(proposalPda);
+        const myVote = votes.find((v) => v.voter === pubkey.toBase58());
+        if (!cancelled) {
+          if (!myVote) setVoteStatus("none");
+          else if (myVote.is_revealed) setVoteStatus("revealed");
+          else setVoteStatus("committed");
+        }
       } catch {
         if (!cancelled) setVoteStatus("none");
       }
@@ -93,7 +87,7 @@ export default function ProposalDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [programReadOnly, proposalPda, wallet?.publicKey]);
+  }, [proposalPda, wallet?.publicKey]);
 
   const now = Math.floor(Date.now() / 1000);
   const deadlinePassed = proposal ? proposal.deadline <= now : false;

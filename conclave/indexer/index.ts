@@ -87,6 +87,13 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_proposals_room ON proposals(room);
   CREATE INDEX IF NOT EXISTS idx_vote_commitments_proposal ON vote_commitments(proposal);
   CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
+
+  CREATE TABLE IF NOT EXISTS group_keys (
+    room TEXT PRIMARY KEY,
+    group_key TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (room) REFERENCES rooms(address)
+  );
 `);
 
 // --- Prepared Statements ---
@@ -272,8 +279,10 @@ app.use(express.json());
 app.use((_req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   next();
 });
+app.options("*", (_req, res) => res.sendStatus(204));
 
 // GET /rooms
 app.get("/rooms", (_req, res) => {
@@ -345,6 +354,28 @@ app.get("/events", (req, res) => {
     .prepare("SELECT * FROM events ORDER BY id DESC LIMIT ?")
     .all(limit);
   res.json(events);
+});
+
+// POST /rooms/:address/key
+app.post("/rooms/:address/key", (req, res) => {
+  const { groupKey } = req.body;
+  if (!groupKey || typeof groupKey !== "string") {
+    return res.status(400).json({ error: "groupKey (base64 string) required" });
+  }
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(
+    "INSERT OR REPLACE INTO group_keys (room, group_key, created_at) VALUES (?, ?, ?)",
+  ).run(req.params.address, groupKey, now);
+  res.json({ ok: true });
+});
+
+// GET /rooms/:address/key
+app.get("/rooms/:address/key", (req, res) => {
+  const row = db
+    .prepare("SELECT group_key FROM group_keys WHERE room = ?")
+    .get(req.params.address) as any;
+  if (!row) return res.status(404).json({ error: "No group key found" });
+  res.json({ groupKey: row.group_key });
 });
 
 // GET /health

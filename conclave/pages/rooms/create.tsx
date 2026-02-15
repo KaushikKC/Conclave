@@ -5,11 +5,14 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
-import { getRoomPda } from "../../lib/conclave";
+import { getRoomPda, getMemberPda } from "../../lib/conclave";
+import { generateGroupKey } from "../../app/sdk/crypto";
+import { postGroupKey } from "../../lib/api";
 
 const MAX_NAME_LEN = 50;
+const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
 export default function CreateRoomPage() {
   const router = useRouter();
@@ -19,6 +22,7 @@ export default function CreateRoomPage() {
   const [governanceMintStr, setGovernanceMintStr] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +51,9 @@ export default function CreateRoomPage() {
     setError("");
     try {
       const roomPda = getRoomPda(wallet, trimmed, program.programId);
+
+      // 1. Create the room
+      setStatus("Creating room…");
       await program.methods
         .createRoom(trimmed)
         .accountsPartial({
@@ -58,16 +65,57 @@ export default function CreateRoomPage() {
         })
         .rpc();
 
-      // Creator joins with their own encrypted group key. We need the creator's secret key
-      // to generate the key — in a browser we don't have it unless they use a signer that
-      // exposes it (e.g. some wallets don't). For now we skip auto-join; user can join from
-      // room page. Optionally store a placeholder in localStorage for "room just created".
-      const roomUrl = `/rooms/${roomPda.toBase58()}`;
-      router.push(roomUrl);
+      // 2. Generate group key
+      const groupKey = generateGroupKey();
+      const groupKeyBase64 = btoa(
+        String.fromCharCode(...groupKey),
+      );
+
+      // 3. Store in localStorage
+      localStorage.setItem(
+        GROUP_KEY_STORAGE_PREFIX + roomPda.toBase58(),
+        JSON.stringify(Array.from(groupKey)),
+      );
+
+      // 4. Post to indexer
+      setStatus("Saving group key…");
+      try {
+        await postGroupKey(roomPda.toBase58(), groupKeyBase64);
+      } catch {
+        // Non-fatal — key is in localStorage, indexer might not be running
+      }
+
+      // 5. Auto-join the room
+      setStatus("Joining room…");
+      try {
+        const memberPda = getMemberPda(roomPda, wallet, program.programId);
+        const tokenAccount = getAssociatedTokenAddressSync(
+          governanceMint,
+          wallet,
+        );
+
+        await program.methods
+          .joinRoom(Array.from(groupKey))
+          .accountsPartial({
+            wallet,
+            room: roomPda,
+            tokenAccount,
+            member: memberPda,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+      } catch {
+        // Non-fatal — user can join from room page
+      }
+
+      // 6. Redirect
+      router.push(`/rooms/${roomPda.toBase58()}`);
     } catch (err: any) {
       setError(err?.message || err?.toString?.() || "Transaction failed.");
     } finally {
       setLoading(false);
+      setStatus("");
     }
   };
 
@@ -123,6 +171,7 @@ export default function CreateRoomPage() {
         </div>
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
+        {status && <p className="text-conclave-accent text-sm">{status}</p>}
 
         <div className="flex gap-3 pt-2">
           <button

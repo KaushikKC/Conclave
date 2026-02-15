@@ -5,12 +5,18 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
-import { getRoomPda, getMemberPda } from "../../lib/conclave";
+import { getMemberPda } from "../../lib/conclave";
 import ChatRoom from "../../components/ChatRoom";
 import MemberList from "../../components/MemberList";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  fetchRoom,
+  fetchRoomMembers,
+  fetchRoomProposals,
+  fetchGroupKey as fetchGroupKeyFromApi,
+  ApiProposal,
+} from "../../lib/api";
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
@@ -28,34 +34,31 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const { roomPda: roomPdaStr } = router.query;
   const { publicKey: wallet, connected } = useWallet();
-  const { program, programReadOnly } = useConclaveProgram();
+  const { program } = useConclaveProgram();
   const [room, setRoom] = useState<RoomData | null>(null);
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(true);
   const [joinLoading, setJoinLoading] = useState(false);
   const [joinError, setJoinError] = useState("");
-  const [encryptedKeyHex, setEncryptedKeyHex] = useState("");
   const [tab, setTab] = useState<Tab>("chat");
   const [groupKey, setGroupKey] = useState<Uint8Array | null>(null);
 
   const roomPda = typeof roomPdaStr === "string" ? roomPdaStr : null;
 
+  // Fetch room data from indexer
   useEffect(() => {
-    if (!programReadOnly || !roomPda) return;
+    if (!roomPda) return;
     let cancelled = false;
     (async () => {
       try {
-        const pubkey = new PublicKey(roomPda);
-        const acc = await (programReadOnly.account as any).daoRoom.fetch(
-          pubkey,
-        );
+        const data = await fetchRoom(roomPda);
         if (cancelled) return;
         setRoom({
-          name: acc.name,
-          authority: acc.authority.toBase58(),
-          governanceMint: acc.governanceMint.toBase58(),
-          memberCount: acc.memberCount ?? 0,
-          proposalCount: acc.proposalCount ?? 0,
+          name: data.name,
+          authority: data.authority,
+          governanceMint: data.governance_mint,
+          memberCount: data.member_count,
+          proposalCount: data.proposal_count,
         });
       } catch {
         if (!cancelled) setRoom(null);
@@ -66,21 +69,17 @@ export default function RoomDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [programReadOnly, roomPda]);
+  }, [roomPda]);
 
+  // Check membership from indexer
   useEffect(() => {
-    if (!programReadOnly || !roomPda || !wallet) return;
+    if (!roomPda || !wallet) return;
     let cancelled = false;
     (async () => {
       try {
-        const roomPubkey = new PublicKey(roomPda);
-        const memberPda = getMemberPda(
-          roomPubkey,
-          wallet,
-          programReadOnly.programId,
-        );
-        await (programReadOnly.account as any).member.fetch(memberPda);
-        if (!cancelled) setIsMember(true);
+        const members = await fetchRoomMembers(roomPda);
+        const found = members.some((m) => m.wallet === wallet.toBase58());
+        if (!cancelled) setIsMember(found);
       } catch {
         if (!cancelled) setIsMember(false);
       }
@@ -88,39 +87,53 @@ export default function RoomDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [programReadOnly, roomPda, wallet]);
+  }, [roomPda, wallet]);
 
+  // Load group key from localStorage, or fetch from indexer
   useEffect(() => {
     if (!roomPda) return;
-    try {
-      const raw = localStorage.getItem(GROUP_KEY_STORAGE_PREFIX + roomPda);
-      if (raw) {
-        const arr = JSON.parse(raw) as number[];
-        setGroupKey(new Uint8Array(arr));
-      }
-    } catch {
-      setGroupKey(null);
-    }
+    (async () => {
+      // Try localStorage first
+      try {
+        const raw = localStorage.getItem(GROUP_KEY_STORAGE_PREFIX + roomPda);
+        if (raw) {
+          const arr = JSON.parse(raw) as number[];
+          setGroupKey(new Uint8Array(arr));
+          return;
+        }
+      } catch {}
+
+      // Fetch from indexer
+      try {
+        const keyBase64 = await fetchGroupKeyFromApi(roomPda);
+        if (keyBase64) {
+          const arr = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
+          localStorage.setItem(
+            GROUP_KEY_STORAGE_PREFIX + roomPda,
+            JSON.stringify(Array.from(arr)),
+          );
+          setGroupKey(arr);
+        }
+      } catch {}
+    })();
   }, [roomPda]);
 
   const handleJoin = async () => {
     if (!program || !wallet || !roomPda || !room) return;
-    let encryptedKeyBytes: number[];
-    try {
-      if (encryptedKeyHex.trim()) {
-        const hex = encryptedKeyHex.trim().replace(/^0x/, "");
-        encryptedKeyBytes = Array.from(Buffer.from(hex, "hex"));
-      } else {
-        encryptedKeyBytes = Array(64).fill(0);
-      }
-    } catch {
-      setJoinError("Invalid encrypted key (use hex).");
-      return;
-    }
 
     setJoinLoading(true);
     setJoinError("");
     try {
+      // Fetch group key from indexer
+      let keyBytes: Uint8Array;
+      const keyBase64 = await fetchGroupKeyFromApi(roomPda);
+      if (keyBase64) {
+        keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
+      } else {
+        // Fallback: zero key (shouldn't happen if room was created properly)
+        keyBytes = new Uint8Array(32);
+      }
+
       const roomPubkey = new PublicKey(roomPda);
       const memberPda = getMemberPda(roomPubkey, wallet, program.programId);
       const governanceMint = new PublicKey(room.governanceMint);
@@ -130,7 +143,7 @@ export default function RoomDetailPage() {
       );
 
       await program.methods
-        .joinRoom(encryptedKeyBytes)
+        .joinRoom(Array.from(keyBytes))
         .accountsPartial({
           wallet,
           room: roomPubkey,
@@ -141,27 +154,17 @@ export default function RoomDetailPage() {
         })
         .rpc();
 
+      // Store group key locally
+      localStorage.setItem(
+        GROUP_KEY_STORAGE_PREFIX + roomPda,
+        JSON.stringify(Array.from(keyBytes)),
+      );
+      setGroupKey(keyBytes);
       setIsMember(true);
-      setEncryptedKeyHex("");
     } catch (err: any) {
       setJoinError(err?.message || "Join failed");
     } finally {
       setJoinLoading(false);
-    }
-  };
-
-  const saveGroupKeyFromInput = () => {
-    if (!roomPda || !encryptedKeyHex.trim()) return;
-    try {
-      const hex = encryptedKeyHex.trim().replace(/^0x/, "");
-      const arr = Array.from(Buffer.from(hex, "hex"));
-      localStorage.setItem(
-        GROUP_KEY_STORAGE_PREFIX + roomPda,
-        JSON.stringify(arr),
-      );
-      setGroupKey(new Uint8Array(arr));
-    } catch {
-      setJoinError("Invalid hex for group key.");
     }
   };
 
@@ -228,17 +231,9 @@ export default function RoomDetailPage() {
             Governance mint: {room.governanceMint}
           </p>
 
-          <p className="text-sm text-gray-300 mb-2">
-            You need at least 1 governance token to join. If the room creator
-            sent you an encrypted group key, paste it below (hex).
+          <p className="text-sm text-gray-300 mb-4">
+            You need at least 1 governance token to join.
           </p>
-          <input
-            type="text"
-            value={encryptedKeyHex}
-            onChange={(e) => setEncryptedKeyHex(e.target.value)}
-            placeholder="Optional: encrypted group key (hex)"
-            className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none font-mono text-sm mb-3"
-          />
           {joinError && (
             <p className="text-red-400 text-sm mb-3">{joinError}</p>
           )}
@@ -286,26 +281,6 @@ export default function RoomDetailPage() {
 
       {tab === "chat" && (
         <div className="card">
-          {!groupKey && (
-            <div className="mb-4 p-3 rounded-lg bg-conclave-dark/50 text-sm text-conclave-muted">
-              Messages are encrypted. Paste the room group key (hex) from the
-              creator and click Save to decrypt.
-              <input
-                type="text"
-                value={encryptedKeyHex}
-                onChange={(e) => setEncryptedKeyHex(e.target.value)}
-                placeholder="Group key (hex)"
-                className="mt-2 w-full rounded border border-conclave-border bg-conclave-dark px-2 py-1 font-mono text-xs"
-              />
-              <button
-                type="button"
-                onClick={saveGroupKeyFromInput}
-                className="btn-secondary mt-2 text-xs"
-              >
-                Save key
-              </button>
-            </div>
-          )}
           <ChatRoom roomPda={roomPubkey} groupKey={groupKey} />
         </div>
       )}
@@ -321,7 +296,7 @@ export default function RoomDetailPage() {
               Create proposal
             </Link>
           </div>
-          <ProposalsList roomPda={roomPubkey} />
+          <ProposalsList roomPda={roomPda} />
         </div>
       )}
 
@@ -335,8 +310,7 @@ export default function RoomDetailPage() {
   );
 }
 
-function ProposalsList({ roomPda }: { roomPda: PublicKey }) {
-  const { programReadOnly } = useConclaveProgram();
+function ProposalsList({ roomPda }: { roomPda: string }) {
   const [list, setList] = useState<
     {
       publicKey: string;
@@ -347,26 +321,22 @@ function ProposalsList({ roomPda }: { roomPda: PublicKey }) {
   >([]);
 
   useEffect(() => {
-    if (!programReadOnly) return;
     (async () => {
       try {
-        const accounts = await (programReadOnly.account as any).proposal.all();
-        const filtered = accounts.filter(
-          (acc: any) => acc.account.room.toBase58() === roomPda.toBase58(),
-        );
+        const proposals = await fetchRoomProposals(roomPda);
         setList(
-          filtered.map((acc: any) => ({
-            publicKey: acc.publicKey.toBase58(),
-            title: acc.account.title,
-            deadline: Number(acc.account.deadline),
-            isFinalized: acc.account.isFinalized ?? false,
+          proposals.map((p: ApiProposal) => ({
+            publicKey: p.address,
+            title: p.title,
+            deadline: p.deadline,
+            isFinalized: p.is_finalized === 1,
           })),
         );
       } catch {
         setList([]);
       }
     })();
-  }, [programReadOnly, roomPda]);
+  }, [roomPda]);
 
   if (list.length === 0) {
     return <p className="text-conclave-muted text-sm">No proposals yet.</p>;
@@ -377,7 +347,7 @@ function ProposalsList({ roomPda }: { roomPda: PublicKey }) {
       {list.map((p) => (
         <li key={p.publicKey}>
           <Link
-            href={`/rooms/${roomPda.toBase58()}/proposals/${p.publicKey}`}
+            href={`/rooms/${roomPda}/proposals/${p.publicKey}`}
             className="block py-2 border-b border-conclave-border/50 hover:text-conclave-accent"
           >
             <span className="font-medium text-white">{p.title}</span>

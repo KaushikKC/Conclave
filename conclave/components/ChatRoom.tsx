@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../hooks/useConclaveProgram";
 import { getMessagePda } from "../lib/conclave";
 import { decryptMessage, encryptMessage } from "../app/sdk/crypto";
+import { fetchRoomMessages } from "../lib/api";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
+const POLL_INTERVAL_MS = 5000;
 
 interface DecryptedMessage {
   publicKey: string;
@@ -22,68 +24,73 @@ interface ChatRoomProps {
 }
 
 export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
-  const { program, programReadOnly, wallet } = useConclaveProgram();
+  const { program, wallet } = useConclaveProgram();
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!programReadOnly || !roomPda) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const accounts = await (programReadOnly.account as any).message.all();
-        if (cancelled) return;
-        const roomFiltered = accounts.filter(
-          (acc: any) => acc.account.room.toBase58() === roomPda.toBase58(),
+  const loadMessages = useCallback(async () => {
+    if (!roomPda) return;
+    try {
+      const data = await fetchRoomMessages(roomPda.toBase58(), 200);
+      const sorted = [...data].sort((a, b) => a.timestamp - b.timestamp);
+
+      if (!groupKey) {
+        setMessages(
+          sorted.map((m) => ({
+            publicKey: m.address,
+            sender: m.sender,
+            text: "[encrypted — need group key]",
+            timestamp: m.timestamp,
+          })),
         );
-        if (!groupKey) {
-          setMessages(
-            roomFiltered.map((acc: any) => ({
-              publicKey: acc.publicKey.toBase58(),
-              sender: acc.account.sender.toBase58(),
-              text: "[encrypted — need group key]",
-              timestamp: Number(acc.account.timestamp),
-            })),
-          );
-          return;
-        }
-        const decrypted: DecryptedMessage[] = [];
-        for (const acc of roomFiltered) {
-          try {
-            const ct = new Uint8Array(acc.account.ciphertext);
-            const text = decryptMessage(groupKey, ct);
-            decrypted.push({
-              publicKey: acc.publicKey.toBase58(),
-              sender: acc.account.sender.toBase58(),
-              text,
-              timestamp: Number(acc.account.timestamp),
-            });
-          } catch {
-            decrypted.push({
-              publicKey: acc.publicKey.toBase58(),
-              sender: acc.account.sender.toBase58(),
-              text: "[decryption failed]",
-              timestamp: Number(acc.account.timestamp),
-            });
-          }
-        }
-        decrypted.sort((a, b) => a.timestamp - b.timestamp);
-        setMessages(decrypted);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to load messages");
-      } finally {
-        if (!cancelled) setLoading(false);
+        return;
       }
-    })();
+
+      const decrypted: DecryptedMessage[] = [];
+      for (const m of sorted) {
+        try {
+          // Indexer stores ciphertext as base64
+          const ct = Uint8Array.from(atob(m.ciphertext), (c) =>
+            c.charCodeAt(0),
+          );
+          const text = decryptMessage(groupKey, ct);
+          decrypted.push({
+            publicKey: m.address,
+            sender: m.sender,
+            text,
+            timestamp: m.timestamp,
+          });
+        } catch {
+          decrypted.push({
+            publicKey: m.address,
+            sender: m.sender,
+            text: "[decryption failed]",
+            timestamp: m.timestamp,
+          });
+        }
+      }
+      setMessages(decrypted);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load messages");
+    } finally {
+      setLoading(false);
+    }
+  }, [roomPda, groupKey]);
+
+  useEffect(() => {
     setLoading(true);
-    return () => {
-      cancelled = true;
-    };
-  }, [programReadOnly, roomPda, groupKey]);
+    loadMessages();
+  }, [loadMessages]);
+
+  // Poll for new messages every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(loadMessages, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

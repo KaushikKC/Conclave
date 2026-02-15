@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
-import { useConclaveProgram } from "../hooks/useConclaveProgram";
+import { fetchRoomMembers } from "../lib/api";
 
 interface MemberItem {
   wallet: string;
@@ -14,24 +14,20 @@ interface MemberListProps {
 }
 
 export default function MemberList({ roomPda }: MemberListProps) {
-  const { programReadOnly } = useConclaveProgram();
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!programReadOnly || !roomPda) return;
+    if (!roomPda) return;
     let cancelled = false;
     (async () => {
       try {
-        const accounts = await (programReadOnly.account as any).member.all();
+        const data = await fetchRoomMembers(roomPda.toBase58());
         if (cancelled) return;
-        const roomFiltered = accounts.filter(
-          (acc: any) => acc.account.room.toBase58() === roomPda.toBase58(),
-        );
         setMembers(
-          roomFiltered.map((acc: any) => ({
-            wallet: acc.account.wallet.toBase58(),
-            joinedAt: Number(acc.account.joinedAt ?? 0),
+          data.map((m) => ({
+            wallet: m.wallet,
+            joinedAt: m.joined_at,
           })),
         );
       } catch {
@@ -43,7 +39,7 @@ export default function MemberList({ roomPda }: MemberListProps) {
     return () => {
       cancelled = true;
     };
-  }, [programReadOnly, roomPda]);
+  }, [roomPda]);
 
   const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 
