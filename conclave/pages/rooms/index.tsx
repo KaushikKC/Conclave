@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchRooms, ApiRoom } from "../../lib/api";
+import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 
 interface RoomItem {
   publicKey: string;
@@ -14,7 +15,7 @@ interface RoomItem {
   createdAt: number;
 }
 
-function mapRoom(r: ApiRoom): RoomItem {
+function mapApiRoom(r: ApiRoom): RoomItem {
   return {
     publicKey: r.address,
     name: r.name,
@@ -27,19 +28,39 @@ function mapRoom(r: ApiRoom): RoomItem {
 }
 
 export default function RoomsListPage() {
+  const { programReadOnly } = useConclaveProgram();
   const [rooms, setRooms] = useState<RoomItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!programReadOnly) return;
     let cancelled = false;
     (async () => {
       try {
         const data = await fetchRooms();
         if (cancelled) return;
-        setRooms(data.map(mapRoom));
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Failed to load rooms");
+        setRooms(data.map(mapApiRoom));
+      } catch {
+        try {
+          const accounts = await (programReadOnly.account as any).daoRoom.all();
+          if (cancelled) return;
+          setRooms(
+            accounts.map((acc: any) => ({
+              publicKey: acc.publicKey.toBase58(),
+              name: acc.account.name,
+              authority: acc.account.authority.toBase58(),
+              governanceMint: acc.account.governanceMint.toBase58(),
+              memberCount: acc.account.memberCount ?? 0,
+              proposalCount: acc.account.proposalCount ?? 0,
+              createdAt: Number(acc.account.createdAt ?? 0),
+            })),
+          );
+          if (cancelled) return;
+          setError("");
+        } catch (e: any) {
+          if (!cancelled) setError(e?.message || "Failed to load rooms");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -47,7 +68,7 @@ export default function RoomsListPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [programReadOnly]);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
