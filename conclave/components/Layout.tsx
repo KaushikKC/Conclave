@@ -10,7 +10,6 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden bg-conclave-dark text-conclave-text font-sans selection:bg-conclave-pink selection:text-white">
-
       {/* Fixed Grid Background provided by globals.css */}
 
       {/* Top Grid Border Line - Fixed to viewport */}
@@ -19,29 +18,40 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="fixed top-0 left-0 right-0 z-50 h-20 bg-conclave-dark border-b border-white/10">
         {/* Container for the main nav bar */}
         <div className="max-w-7xl mx-auto h-full border-x border-white/10 grid grid-cols-[100px_1fr_100px] md:grid-cols-[140px_1fr_140px] relative">
-
           {/* Left: Logo */}
           <div className="border-r border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors group cursor-pointer bg-conclave-dark relative z-20">
-            <Link href="/" className="text-3xl grayscale group-hover:grayscale-0 transition-all transform group-hover:scale-110">
+            <Link
+              href="/"
+              className="text-3xl grayscale group-hover:grayscale-0 transition-all transform group-hover:scale-110"
+            >
               ❤️
             </Link>
           </div>
 
           {/* Center: Navigation */}
           <nav className="flex items-center justify-center gap-4 md:gap-8 h-full px-4 md:px-8 relative overflow-hidden bg-conclave-dark">
-            <Link href="/" className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group">
+            <Link
+              href="/"
+              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+            >
               HOME
               <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-pink scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
             <span className="text-conclave-green/50 text-[8px]">•</span>
-            <Link href="/rooms" className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group">
+            <Link
+              href="/rooms"
+              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+            >
               ROOMS
               <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-yellow scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
             {connected && (
               <>
                 <span className="text-conclave-yellow/50 text-[8px]">•</span>
-                <Link href="/rooms/create" className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group">
+                <Link
+                  href="/rooms/create"
+                  className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+                >
                   CREATE
                   <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-blue scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
                 </Link>
@@ -49,12 +59,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             )}
           </nav>
 
-          {/* Right: Wallet Action - Strictly contained */}
-          <div className="border-l border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors bg-conclave-dark relative z-20 overflow-hidden">
+          {/* Right: Wallet Action - no overflow-hidden so dropdown can show */}
+          <div className="border-l border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors bg-conclave-dark relative z-[100]">
             <div className="w-full h-full flex items-center justify-center p-2">
-              {/* Using a wrapper to force the button to respect the container */}
-              <div className="scale-[0.6] md:scale-90 origin-center text-[10px]">
-                <WalletMultiButton className="!h-10 !px-4 !bg-transparent !border !border-conclave-text !rounded-full !text-conclave-text !text-[10px] !font-bold !uppercase !tracking-widest hover:!text-white transition-all flex items-center justify-center gap-2 whitespace-nowrap" />
+              <div className="scale-[0.6] md:scale-90 origin-center text-[10px] [&_.wallet-adapter-button]:!text-conclave-text [&_.wallet-adapter-button:hover]:!text-conclave-dark">
+                <WalletMultiButton className="!h-10 !px-4 !bg-transparent !border !border-conclave-text !rounded-full !text-[10px] !font-bold !uppercase !tracking-widest hover:!bg-white transition-all flex items-center justify-center gap-2 whitespace-nowrap" />
               </div>
             </div>
           </div>
@@ -76,7 +85,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <footer className="w-full max-w-7xl mx-auto border-x border-b border-t border-white/10 py-12 text-center bg-conclave-dark relative z-10">
         <div className="flex items-center justify-center gap-4 mb-8">
           <div className="h-px w-20 bg-white/10"></div>
-          <p className="text-conclave-text/40 text-[10px] uppercase tracking-[0.3em]">Solana Devnet · 2026</p>
+          <p className="text-conclave-text/40 text-[10px] uppercase tracking-[0.3em]">
+            Solana Devnet · 2026
+          </p>
           <div className="h-px w-20 bg-white/10"></div>
         </div>
       </footer>
