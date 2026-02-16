@@ -22,6 +22,7 @@ import {
   fetchGroupKey as fetchGroupKeyFromApi,
   postGroupKey,
   postGroupKeyWithRetry,
+  notifyIndexer,
   ApiProposal,
 } from "../../lib/api";
 
@@ -271,6 +272,8 @@ export default function RoomDetailPage() {
       );
       setGroupKey(keyBytes);
       setIsMember(true);
+      // Notify indexer about the new member + updated room
+      notifyIndexer([memberPda.toBase58(), roomPda]);
     } catch (err: any) {
       setJoinError(err?.message || "Join failed");
     } finally {

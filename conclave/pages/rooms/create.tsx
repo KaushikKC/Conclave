@@ -13,7 +13,7 @@ import {
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getRoomPda, getMemberPda } from "../../lib/conclave";
 import { generateGroupKey } from "../../app/sdk/crypto";
-import { postGroupKeyWithRetry } from "../../lib/api";
+import { postGroupKeyWithRetry, notifyIndexer } from "../../lib/api";
 
 const MAX_NAME_LEN = 50;
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
@@ -73,6 +73,9 @@ export default function CreateRoomPage() {
       // 2. Wait for tx confirmation before posting key
       setStatus("Confirming transaction…");
       await connection.confirmTransaction(sig, "confirmed");
+
+      // 2b. Notify indexer about the new room immediately
+      notifyIndexer([roomPda.toBase58()]);
 
       // 3. Generate group key
       const groupKey = generateGroupKey();

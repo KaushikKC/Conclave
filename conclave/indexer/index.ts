@@ -331,6 +331,8 @@ async function ensureRoomInDb(roomAddress: string): Promise<boolean> {
 
 // --- Log Subscription (Real-time) ---
 
+let reindexQueued = false;
+
 function subscribeToLogs() {
   console.log("Subscribing to program logs...");
 
@@ -342,23 +344,29 @@ function subscribeToLogs() {
       for (const log of logMessages) {
         if (log.startsWith("Program data:")) {
           const eventData = log.replace("Program data: ", "");
-          const slot = 0; // We'd need to fetch the tx for the actual slot
+          const slot = 0;
           const now = Math.floor(Date.now() / 1000);
 
-          // Parse event type from the base64 data
           const decoded = Buffer.from(eventData, "base64");
           const discriminator = decoded.slice(0, 8).toString("hex");
 
           let eventType = "unknown";
-          // Event discriminators are sha256("event:<EventName>")[0..8]
-          // We store raw and let consumers filter
           insertEvent.run(eventType, eventData, signature, slot, now);
         }
       }
 
-      // Re-index affected accounts after any transaction
-      // In production, you'd parse the tx to know which accounts changed
-      // For hackathon, we do a lightweight re-index every N seconds
+      // Re-index accounts shortly after a tx is detected so new messages/members appear fast
+      if (!reindexQueued) {
+        reindexQueued = true;
+        setTimeout(async () => {
+          reindexQueued = false;
+          try {
+            await indexAllAccounts();
+          } catch (err) {
+            console.error("Log-triggered re-index error:", err);
+          }
+        }, 2000);
+      }
     },
     "confirmed",
   );
@@ -371,7 +379,7 @@ setInterval(async () => {
   } catch (err) {
     console.error("Re-index error:", err);
   }
-}, 30_000); // Every 30 seconds
+}, 10_000); // Every 10 seconds (fallback if log subscription misses events)
 
 // --- REST API ---
 
@@ -499,6 +507,59 @@ app.get("/rooms/:address/key", (req, res) => {
     .get(req.params.address) as any;
   if (!row) return res.status(404).json({ error: "No group key found" });
   res.json({ groupKey: row.group_key });
+});
+
+// POST /notify — frontend tells indexer about a new/updated account so it's indexed instantly
+app.post("/notify", async (req, res) => {
+  const { accounts } = req.body;
+  if (!accounts || !Array.isArray(accounts) || accounts.length === 0) {
+    return res.status(400).json({ error: "accounts[] required" });
+  }
+  const now = Math.floor(Date.now() / 1000);
+  let indexed = 0;
+  for (const addr of accounts) {
+    try {
+      const pubkey = new PublicKey(addr);
+      const accountInfo = await connection.getAccountInfo(pubkey);
+      if (!accountInfo || !accountInfo.data.length) continue;
+      const data = accountInfo.data;
+
+      try {
+        const decoded = accountsCoder.decode("DaoRoom", data);
+        upsertRoom.run(addr, decoded.authority.toBase58(), decoded.governanceMint.toBase58(), decoded.name, decoded.memberCount, decoded.proposalCount, decoded.createdAt.toNumber(), now);
+        indexed++;
+        continue;
+      } catch {}
+      try {
+        const decoded = accountsCoder.decode("Member", data);
+        upsertMember.run(addr, decoded.wallet.toBase58(), decoded.room.toBase58(), decoded.joinedAt.toNumber(), now);
+        indexed++;
+        continue;
+      } catch {}
+      try {
+        const decoded = accountsCoder.decode("Proposal", data);
+        upsertProposal.run(addr, decoded.room.toBase58(), decoded.creator.toBase58(), decoded.title, decoded.description, decoded.voteYesCount, decoded.voteNoCount, decoded.deadline.toNumber(), decoded.isFinalized ? 1 : 0, now);
+        indexed++;
+        continue;
+      } catch {}
+      try {
+        const decoded = accountsCoder.decode("Message", data);
+        upsertMessage.run(addr, decoded.room.toBase58(), decoded.sender.toBase58(), Buffer.from(decoded.ciphertext).toString("base64"), decoded.timestamp.toNumber(), now);
+        indexed++;
+        continue;
+      } catch {}
+      try {
+        const decoded = accountsCoder.decode("VoteCommitment", data);
+        upsertVoteCommitment.run(addr, decoded.voter.toBase58(), decoded.proposal.toBase58(), decoded.isRevealed ? 1 : 0, now);
+        indexed++;
+        continue;
+      } catch {}
+    } catch (err) {
+      console.error(`Failed to fetch/index account ${addr}:`, err);
+    }
+  }
+  console.log(`Notify: indexed ${indexed}/${accounts.length} accounts`);
+  res.json({ ok: true, indexed });
 });
 
 // GET /health

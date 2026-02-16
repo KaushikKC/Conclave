@@ -125,6 +125,19 @@ export async function postGroupKey(
   if (!res.ok) throw new Error(`Failed to post group key: ${res.status}`);
 }
 
+/** Tell the indexer to fetch and index specific accounts immediately */
+export async function notifyIndexer(accounts: string[]): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/notify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accounts }),
+    });
+  } catch {
+    // Non-fatal — indexer will pick it up on next poll
+  }
+}
+
 export async function postGroupKeyWithRetry(
   roomAddress: string,
   groupKeyBase64: string,
