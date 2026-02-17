@@ -7,6 +7,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../../../../hooks/useConclaveProgram";
 import { getMemberPda, getProposalPda } from "../../../../lib/conclave";
+import { notifyIndexer } from "../../../../lib/api";
 
 const MAX_TITLE = 100;
 const MAX_DESC = 500;
@@ -67,6 +68,7 @@ export default function CreateProposalPage() {
         })
         .rpc();
 
+      notifyIndexer([proposalPda.toBase58(), roomPda]);
       router.push(`/rooms/${roomPda}/proposals/${proposalPda.toBase58()}`);
     } catch (err: any) {
       setError(err?.message || "Transaction failed.");

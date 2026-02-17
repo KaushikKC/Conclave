@@ -6,7 +6,8 @@ import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../hooks/useConclaveProgram";
 import { getMessagePda } from "../lib/conclave";
 import { decryptMessage, encryptMessage } from "../app/sdk/crypto";
-import { fetchRoomMessages, notifyIndexer } from "../lib/api";
+import { fetchRoomMessages, postMessage } from "../lib/api";
+import { getAnonAlias } from "../lib/anon";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
 const POLL_INTERVAL_MS = 5000;
@@ -161,14 +162,21 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
       setMessages((prev) => [
         ...prev,
         {
-          publicKey: "",
+          publicKey: messagePda.toBase58(),
           sender: wallet.publicKey!.toBase58(),
           text: plaintext,
           timestamp,
         },
       ]);
-      // Tell the indexer about the new message so other users see it immediately
-      notifyIndexer([messagePda.toBase58(), roomPda.toBase58()]);
+      // Relay encrypted message directly to indexer so other users see it immediately
+      const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
+      postMessage(
+        roomPda.toBase58(),
+        messagePda.toBase58(),
+        wallet.publicKey!.toBase58(),
+        ciphertextBase64,
+        timestamp,
+      );
     } catch (err: any) {
       setError(err?.message || "Send failed");
     } finally {

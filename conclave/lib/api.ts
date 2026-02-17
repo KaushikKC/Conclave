@@ -125,6 +125,62 @@ export async function postGroupKey(
   if (!res.ok) throw new Error(`Failed to post group key: ${res.status}`);
 }
 
+/** Store encrypted vote data in the indexer (backup for localStorage) */
+export async function storeVoteData(
+  proposal: string,
+  voter: string,
+  encryptedData: string,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/votes/data`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ proposal, voter, encryptedData }),
+    });
+  } catch {
+    // Non-fatal
+  }
+}
+
+/** Retrieve encrypted vote data from the indexer */
+export async function fetchVoteData(
+  proposal: string,
+  voter: string,
+): Promise<string | null> {
+  try {
+    const data = await fetchJSON<{ encryptedData: string }>(
+      `/votes/data/${proposal}/${voter}`,
+    );
+    return data.encryptedData;
+  } catch {
+    return null;
+  }
+}
+
+/** Relay an encrypted message directly to the indexer (fast path, no chain fetch needed) */
+export async function postMessage(
+  roomAddress: string,
+  messageAddress: string,
+  sender: string,
+  ciphertextBase64: string,
+  timestamp: number,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/rooms/${roomAddress}/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        address: messageAddress,
+        sender,
+        ciphertext: ciphertextBase64,
+        timestamp,
+      }),
+    });
+  } catch {
+    // Non-fatal — indexer will pick it up on next poll
+  }
+}
+
 /** Tell the indexer to fetch and index specific accounts immediately */
 export async function notifyIndexer(accounts: string[]): Promise<void> {
   try {

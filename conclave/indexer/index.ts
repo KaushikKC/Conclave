@@ -19,6 +19,7 @@ const DB_PATH = process.env.DB_PATH || path.join(__dirname, "conclave.db");
 
 const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL");
+db.pragma("foreign_keys = OFF");
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS rooms (
@@ -37,8 +38,7 @@ db.exec(`
     wallet TEXT NOT NULL,
     room TEXT NOT NULL,
     joined_at INTEGER NOT NULL,
-    indexed_at INTEGER NOT NULL,
-    FOREIGN KEY (room) REFERENCES rooms(address)
+    indexed_at INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS proposals (
@@ -51,8 +51,7 @@ db.exec(`
     vote_no_count INTEGER DEFAULT 0,
     deadline INTEGER NOT NULL,
     is_finalized INTEGER DEFAULT 0,
-    indexed_at INTEGER NOT NULL,
-    FOREIGN KEY (room) REFERENCES rooms(address)
+    indexed_at INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -61,8 +60,7 @@ db.exec(`
     sender TEXT NOT NULL,
     ciphertext TEXT NOT NULL,
     timestamp INTEGER NOT NULL,
-    indexed_at INTEGER NOT NULL,
-    FOREIGN KEY (room) REFERENCES rooms(address)
+    indexed_at INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS vote_commitments (
@@ -70,8 +68,7 @@ db.exec(`
     voter TEXT NOT NULL,
     proposal TEXT NOT NULL,
     is_revealed INTEGER DEFAULT 0,
-    indexed_at INTEGER NOT NULL,
-    FOREIGN KEY (proposal) REFERENCES proposals(address)
+    indexed_at INTEGER NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS events (
@@ -94,6 +91,14 @@ db.exec(`
     room TEXT PRIMARY KEY,
     group_key TEXT NOT NULL,
     created_at INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS vote_data (
+    proposal TEXT NOT NULL,
+    voter TEXT NOT NULL,
+    encrypted_data TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (proposal, voter)
   );
 `);
 
@@ -433,6 +438,19 @@ app.get("/rooms/:address/messages", (req, res) => {
   res.json(messages);
 });
 
+// POST /rooms/:address/messages — frontend relays encrypted message directly (fast path)
+app.post("/rooms/:address/messages", (req, res) => {
+  const { address, sender, ciphertext, timestamp } = req.body;
+  if (!address || !sender || !ciphertext || timestamp == null) {
+    return res.status(400).json({ error: "address, sender, ciphertext, timestamp required" });
+  }
+  const roomAddress = req.params.address;
+  const now = Math.floor(Date.now() / 1000);
+  upsertMessage.run(address, roomAddress, sender, ciphertext, timestamp, now);
+  console.log(`Relayed message ${address} in room ${roomAddress}`);
+  res.json({ ok: true });
+});
+
 // GET /rooms/:address/proposals
 app.get("/rooms/:address/proposals", (req, res) => {
   const proposals = db
@@ -507,6 +525,28 @@ app.get("/rooms/:address/key", (req, res) => {
     .get(req.params.address) as any;
   if (!row) return res.status(404).json({ error: "No group key found" });
   res.json({ groupKey: row.group_key });
+});
+
+// POST /votes/data — store encrypted vote nonce for recovery across devices
+app.post("/votes/data", (req, res) => {
+  const { proposal, voter, encryptedData } = req.body;
+  if (!proposal || !voter || !encryptedData) {
+    return res.status(400).json({ error: "proposal, voter, encryptedData required" });
+  }
+  const now = Math.floor(Date.now() / 1000);
+  db.prepare(
+    "INSERT OR REPLACE INTO vote_data (proposal, voter, encrypted_data, created_at) VALUES (?, ?, ?, ?)",
+  ).run(proposal, voter, encryptedData, now);
+  res.json({ ok: true });
+});
+
+// GET /votes/data/:proposal/:voter — retrieve encrypted vote nonce
+app.get("/votes/data/:proposal/:voter", (req, res) => {
+  const row = db
+    .prepare("SELECT encrypted_data FROM vote_data WHERE proposal = ? AND voter = ?")
+    .get(req.params.proposal, req.params.voter) as any;
+  if (!row) return res.status(404).json({ error: "No vote data found" });
+  res.json({ encryptedData: row.encrypted_data });
 });
 
 // POST /notify — frontend tells indexer about a new/updated account so it's indexed instantly
