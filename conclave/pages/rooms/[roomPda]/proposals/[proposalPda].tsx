@@ -8,6 +8,7 @@ import { useConclaveProgram } from "../../../../hooks/useConclaveProgram";
 import { getMemberPda, getVoteCommitmentPda } from "../../../../lib/conclave";
 import { createVoteCommitment } from "../../../../app/sdk/crypto";
 import { fetchProposal, fetchProposalVotes, fetchRoom, notifyIndexer, storeVoteData, fetchVoteData } from "../../../../lib/api";
+import { getAnonAlias } from "../../../../lib/anon";
 import { encryptMessage, decryptMessage } from "../../../../app/sdk/crypto";
 import { fetchGroupKey as fetchGroupKeyFromApi } from "../../../../lib/api";
 
@@ -54,9 +55,30 @@ export default function ProposalDetailPage() {
 
   const deadlinePassed = proposal ? proposal.deadline <= now : false;
 
-  // Fetch proposal data — from indexer, fallback to chain
+  // Fetch proposal data — always prefer chain for vote counts (source of truth)
   const refreshProposal = useCallback(async () => {
     if (!proposalPda) return;
+    // Try chain first (has real-time vote counts)
+    if (programReadOnly) {
+      try {
+        const acc = await (programReadOnly.account as any).proposal.fetch(
+          new PublicKey(proposalPda),
+        );
+        setProposal({
+          room: acc.room.toBase58(),
+          creator: acc.creator.toBase58(),
+          title: acc.title,
+          description: acc.description,
+          voteYesCount: acc.voteYesCount,
+          voteNoCount: acc.voteNoCount,
+          deadline: acc.deadline.toNumber(),
+          isFinalized: acc.isFinalized,
+        });
+        setLoading(false);
+        return;
+      } catch {}
+    }
+    // Fallback to indexer
     try {
       const data = await fetchProposal(proposalPda);
       setProposal({
@@ -70,26 +92,7 @@ export default function ProposalDetailPage() {
         isFinalized: data.is_finalized === 1,
       });
     } catch {
-      // Fallback: fetch from chain
-      if (programReadOnly) {
-        try {
-          const acc = await (programReadOnly.account as any).proposal.fetch(
-            new PublicKey(proposalPda),
-          );
-          setProposal({
-            room: acc.room.toBase58(),
-            creator: acc.creator.toBase58(),
-            title: acc.title,
-            description: acc.description,
-            voteYesCount: acc.voteYesCount,
-            voteNoCount: acc.voteNoCount,
-            deadline: acc.deadline.toNumber(),
-            isFinalized: acc.isFinalized,
-          });
-        } catch {
-          setProposal(null);
-        }
-      }
+      setProposal(null);
     } finally {
       setLoading(false);
     }
@@ -385,7 +388,7 @@ export default function ProposalDetailPage() {
       <div className="card mb-6">
         <h1 className="text-2xl font-bold text-white mb-2">{proposal.title}</h1>
         <p className="text-conclave-muted text-sm mb-4">
-          By {proposal.creator.slice(0, 6)}…{proposal.creator.slice(-4)} ·
+          By {roomPda ? getAnonAlias(proposal.creator, roomPda) : "Unknown"} ·
           Deadline: {new Date(proposal.deadline * 1000).toLocaleString()}
           {deadlinePassed ? " (passed)" : ""}
         </p>

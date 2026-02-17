@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { fetchRoomMembers } from "../lib/api";
+import { getAnonAlias } from "../lib/anon";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useConclaveProgram } from "../hooks/useConclaveProgram";
 
 interface MemberItem {
   wallet: string;
@@ -14,6 +17,8 @@ interface MemberListProps {
 }
 
 export default function MemberList({ roomPda }: MemberListProps) {
+  const { publicKey: myWallet } = useWallet();
+  const { programReadOnly } = useConclaveProgram();
   const [members, setMembers] = useState<MemberItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -21,27 +26,41 @@ export default function MemberList({ roomPda }: MemberListProps) {
     if (!roomPda) return;
     let cancelled = false;
     (async () => {
+      // Try indexer first
       try {
         const data = await fetchRoomMembers(roomPda.toBase58());
-        if (cancelled) return;
-        setMembers(
-          data.map((m) => ({
-            wallet: m.wallet,
-            joinedAt: m.joined_at,
-          })),
-        );
-      } catch {
-        setMembers([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomPda]);
+        if (!cancelled && data.length > 0) {
+          setMembers(data.map((m) => ({ wallet: m.wallet, joinedAt: m.joined_at })));
+          setLoading(false);
+          return;
+        }
+      } catch {}
 
-  const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+      // Fallback: fetch member accounts from chain via getProgramAccounts
+      if (programReadOnly && !cancelled) {
+        try {
+          const allMembers = await (programReadOnly.account as any).member.all([
+            { memcmp: { offset: 40, bytes: roomPda.toBase58() } },
+          ]);
+          if (!cancelled) {
+            setMembers(
+              allMembers.map((m: any) => ({
+                wallet: m.account.wallet.toBase58(),
+                joinedAt: m.account.joinedAt.toNumber(),
+              })),
+            );
+          }
+        } catch {
+          if (!cancelled) setMembers([]);
+        }
+      }
+
+      if (!cancelled) setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [roomPda, programReadOnly]);
+
+  const roomAddr = roomPda.toBase58();
 
   return (
     <div>
@@ -53,17 +72,23 @@ export default function MemberList({ roomPda }: MemberListProps) {
       )}
       {!loading && members.length > 0 && (
         <ul className="space-y-2">
-          {members.map((m) => (
-            <li
-              key={m.wallet}
-              className="flex items-center justify-between text-sm py-1 border-b border-conclave-border/50"
-            >
-              <span className="font-mono text-gray-300">{short(m.wallet)}</span>
-              <span className="text-conclave-muted text-xs">
-                {new Date(m.joinedAt * 1000).toLocaleDateString()}
-              </span>
-            </li>
-          ))}
+          {members.map((m) => {
+            const isMe = myWallet && m.wallet === myWallet.toBase58();
+            const alias = getAnonAlias(m.wallet, roomAddr);
+            return (
+              <li
+                key={m.wallet}
+                className="flex items-center justify-between text-sm py-1 border-b border-conclave-border/50"
+              >
+                <span className="font-medium text-gray-300">
+                  {alias}{isMe ? " (you)" : ""}
+                </span>
+                <span className="text-conclave-muted text-xs">
+                  Joined {new Date(m.joinedAt * 1000).toLocaleDateString()}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

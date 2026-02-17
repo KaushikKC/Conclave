@@ -184,8 +184,11 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     }
   };
 
-  const shortAddress = (addr: string) =>
-    `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+  const anonName = (addr: string) => {
+    const isMe = wallet?.publicKey && addr === wallet.publicKey.toBase58();
+    const alias = getAnonAlias(addr, roomPda.toBase58());
+    return isMe ? `${alias} (you)` : alias;
+  };
 
   return (
     <div className="flex flex-col h-[400px]">
@@ -193,8 +196,8 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         {loading && <p className="text-conclave-muted text-sm">Loading…</p>}
         {messages.map((m) => (
           <div key={m.publicKey || m.timestamp} className="text-sm">
-            <span className="text-conclave-accent font-mono">
-              {shortAddress(m.sender)}
+            <span className="text-conclave-accent font-medium">
+              {anonName(m.sender)}
             </span>
             <span className="text-conclave-muted mx-2">·</span>
             <span className="text-gray-300">{m.text}</span>
