@@ -490,10 +490,41 @@ export default function ProposalDetailPage() {
       )}
 
       {proposal.isFinalized && (
-        <div className="card mb-6">
-          <p className="text-green-400 font-semibold">
-            This proposal has been finalized.
-          </p>
+        <div className={`card mb-6 border ${
+          proposal.voteYesCount > proposal.voteNoCount
+            ? "border-green-500/30 bg-green-500/5"
+            : proposal.voteNoCount > proposal.voteYesCount
+            ? "border-red-500/30 bg-red-500/5"
+            : "border-yellow-500/30 bg-yellow-500/5"
+        }`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`text-lg font-bold ${
+                proposal.voteYesCount > proposal.voteNoCount
+                  ? "text-green-400"
+                  : proposal.voteNoCount > proposal.voteYesCount
+                  ? "text-red-400"
+                  : "text-yellow-400"
+              }`}>
+                {proposal.voteYesCount > proposal.voteNoCount
+                  ? "PASSED"
+                  : proposal.voteNoCount > proposal.voteYesCount
+                  ? "REJECTED"
+                  : "TIED"}
+              </p>
+              <p className="text-conclave-muted text-sm mt-1">
+                {proposal.voteYesCount} Yes / {proposal.voteNoCount} No — Finalized on-chain
+              </p>
+            </div>
+            <a
+              href={`https://explorer.solana.com/address/${proposalPda}?cluster=devnet`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs px-3 py-1.5 rounded-full border border-conclave-border text-conclave-accent hover:bg-conclave-accent/10 transition"
+            >
+              View on Explorer
+            </a>
+          </div>
         </div>
       )}
 

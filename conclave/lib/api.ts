@@ -157,6 +157,17 @@ export async function fetchVoteData(
   }
 }
 
+/** Delete a message from the indexer DB (after on-chain close_message) */
+export async function deleteMessageFromIndexer(
+  messageAddress: string,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/messages/${messageAddress}`, { method: "DELETE" });
+  } catch {
+    // Non-fatal — indexer will drop it on next re-index when account is gone
+  }
+}
+
 /** Relay an encrypted message directly to the indexer (fast path, no chain fetch needed) */
 export async function postMessage(
   roomAddress: string,

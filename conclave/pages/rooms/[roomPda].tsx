@@ -54,8 +54,10 @@ export default function RoomDetailPage() {
   const [publishKeyLoading, setPublishKeyLoading] = useState(false);
   const [publishKeyDone, setPublishKeyDone] = useState(false);
 
+  const inviteKey = typeof router.query.key === "string" ? router.query.key : null;
   const roomPda = typeof roomPdaStr === "string" ? roomPdaStr : null;
   const { programReadOnly } = useConclaveProgram();
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   // Fetch room data from indexer, fallback to chain if 404 (e.g. right after create)
   useEffect(() => {
@@ -141,7 +143,7 @@ export default function RoomDetailPage() {
     };
   }, [roomPda, wallet, programReadOnly, connection]);
 
-  // Load group key from localStorage, or fetch from indexer.
+  // Load group key from localStorage, invite link, or indexer.
   // If creator has key locally but indexer doesn't, auto-republish it.
   useEffect(() => {
     if (!roomPda) return;
@@ -149,15 +151,27 @@ export default function RoomDetailPage() {
     (async () => {
       let localKey: Uint8Array | null = null;
 
+      // If invite link has a key, store it immediately
+      if (inviteKey) {
+        try {
+          const decoded = Uint8Array.from(atob(inviteKey.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+          localStorage.setItem(GROUP_KEY_STORAGE_PREFIX + roomPda, JSON.stringify(Array.from(decoded)));
+          localKey = decoded;
+          if (!cancelled) setGroupKey(decoded);
+        } catch {}
+      }
+
       // Try localStorage first
-      try {
-        const raw = localStorage.getItem(GROUP_KEY_STORAGE_PREFIX + roomPda);
-        if (raw) {
-          const arr = JSON.parse(raw) as number[];
-          localKey = new Uint8Array(arr);
-          if (!cancelled) setGroupKey(localKey);
-        }
-      } catch {}
+      if (!localKey) {
+        try {
+          const raw = localStorage.getItem(GROUP_KEY_STORAGE_PREFIX + roomPda);
+          if (raw) {
+            const arr = JSON.parse(raw) as number[];
+            localKey = new Uint8Array(arr);
+            if (!cancelled) setGroupKey(localKey);
+          }
+        } catch {}
+      }
 
       // Fetch from indexer
       let indexerHasKey = false;
@@ -189,7 +203,7 @@ export default function RoomDetailPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [roomPda, room, wallet]);
+  }, [roomPda, room, wallet, inviteKey]);
 
   const handleJoin = async () => {
     if (!program || !wallet || !roomPda || !room) return;
@@ -366,6 +380,18 @@ export default function RoomDetailPage() {
 
   const isAuthority = room && wallet && room.authority === wallet.toBase58();
 
+  const copyInviteLink = () => {
+    if (!groupKey || !roomPda) return;
+    const keyBase64 = btoa(String.fromCharCode(...groupKey))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const link = `${baseUrl}/rooms/${roomPda}?key=${keyBase64}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    });
+  };
+
   const handlePublishKey = async () => {
     if (!roomPda || !groupKey) return;
     setPublishKeyLoading(true);
@@ -388,7 +414,17 @@ export default function RoomDetailPage() {
       >
         ← Rooms
       </Link>
-      <h1 className="text-2xl font-bold text-white mb-6">{room.name}</h1>
+      <div className="flex items-center gap-4 mb-6">
+        <h1 className="text-2xl font-bold text-white">{room.name}</h1>
+        {groupKey && (
+          <button
+            onClick={copyInviteLink}
+            className="text-xs px-3 py-1 rounded-full border border-conclave-border text-conclave-muted hover:text-conclave-accent hover:border-conclave-accent transition"
+          >
+            {inviteCopied ? "Copied!" : "Copy invite link"}
+          </button>
+        )}
+      </div>
 
       {isAuthority && groupKey && (
         <div className="mb-4 p-3 rounded-lg bg-conclave-card border border-conclave-border text-sm text-conclave-muted">

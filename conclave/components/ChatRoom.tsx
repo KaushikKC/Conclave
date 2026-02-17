@@ -6,17 +6,26 @@ import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../hooks/useConclaveProgram";
 import { getMessagePda } from "../lib/conclave";
 import { decryptMessage, encryptMessage } from "../app/sdk/crypto";
-import { fetchRoomMessages, postMessage } from "../lib/api";
+import { fetchRoomMessages, postMessage, deleteMessageFromIndexer } from "../lib/api";
 import { getAnonAlias } from "../lib/anon";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
 const POLL_INTERVAL_MS = 5000;
+const EPHEMERAL_CHECK_MS = 3000;
+
+const EPHEMERAL_DURATIONS = [
+  { label: "30s", seconds: 30 },
+  { label: "1m", seconds: 60 },
+  { label: "5m", seconds: 300 },
+  { label: "15m", seconds: 900 },
+];
 
 interface DecryptedMessage {
   publicKey: string;
   sender: string;
   text: string;
   timestamp: number;
+  expiresAt?: number; // unix timestamp when this message self-destructs
 }
 
 interface ChatRoomProps {
@@ -31,12 +40,23 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [ephemeral, setEphemeral] = useState(false);
+  const [ephemeralDuration, setEphemeralDuration] = useState(60); // default 1 min
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
   const bottomRef = useRef<HTMLDivElement>(null);
   const pendingSentRef = useRef<{
     sender: string;
     timestamp: number;
     text: string;
   } | null>(null);
+  // Track ephemeral messages this user sent { messagePda: expiresAt }
+  const ephemeralMapRef = useRef<Map<string, number>>(new Map());
+
+  // Update "now" every second for countdown display
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadMessages = useCallback(async () => {
     if (!roomPda) return;
@@ -49,7 +69,7 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
           sorted.map((m) => ({
             publicKey: m.address,
             sender: m.sender,
-            text: "[encrypted — need group key]",
+            text: "[encrypted -- need group key]",
             timestamp: m.timestamp,
           })),
         );
@@ -63,11 +83,13 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
             c.charCodeAt(0),
           );
           const text = decryptMessage(groupKey, ct);
+          const expiresAt = ephemeralMapRef.current.get(m.address);
           decrypted.push({
             publicKey: m.address,
             sender: m.sender,
             text,
             timestamp: m.timestamp,
+            expiresAt,
           });
         } catch {
           decrypted.push({
@@ -79,7 +101,7 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         }
       }
 
-      // Keep optimistic message visible until it appears from the indexer (stops "message disappears" after poll)
+      // Keep optimistic message visible until it appears from the indexer
       const pending = pendingSentRef.current;
       if (pending) {
         const found = decrypted.some(
@@ -116,6 +138,39 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     return () => clearInterval(interval);
   }, [loadMessages]);
 
+  // Auto-delete expired ephemeral messages
+  useEffect(() => {
+    if (!program || !wallet?.publicKey) return;
+    const interval = setInterval(async () => {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const toDelete: string[] = [];
+      for (const [pda, expiresAt] of ephemeralMapRef.current.entries()) {
+        if (currentTime >= expiresAt) {
+          toDelete.push(pda);
+        }
+      }
+      for (const pda of toDelete) {
+        try {
+          await program.methods
+            .closeMessage()
+            .accountsPartial({
+              sender: wallet.publicKey!,
+              message: new PublicKey(pda),
+            })
+            .rpc();
+          deleteMessageFromIndexer(pda);
+          ephemeralMapRef.current.delete(pda);
+          setMessages((prev) => prev.filter((m) => m.publicKey !== pda));
+        } catch (err) {
+          console.warn("Failed to close ephemeral message:", pda, err);
+          // Remove from tracking to avoid infinite retries
+          ephemeralMapRef.current.delete(pda);
+        }
+      }
+    }, EPHEMERAL_CHECK_MS);
+    return () => clearInterval(interval);
+  }, [program, wallet?.publicKey]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -139,7 +194,6 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         timestamp,
         program.programId,
       );
-      // Pass ciphertext as Buffer/Uint8Array so Anchor encodes bytes correctly (avoids Blob.encode length errors)
       const ciphertextBuf =
         typeof Buffer !== "undefined"
           ? Buffer.from(ciphertext)
@@ -154,6 +208,12 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         })
         .rpc();
       setInput("");
+
+      const expiresAt = ephemeral ? timestamp + ephemeralDuration : undefined;
+      if (ephemeral && expiresAt) {
+        ephemeralMapRef.current.set(messagePda.toBase58(), expiresAt);
+      }
+
       pendingSentRef.current = {
         sender: wallet.publicKey!.toBase58(),
         timestamp,
@@ -166,9 +226,10 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
           sender: wallet.publicKey!.toBase58(),
           text: plaintext,
           timestamp,
+          expiresAt,
         },
       ]);
-      // Relay encrypted message directly to indexer so other users see it immediately
+      // Relay encrypted message directly to indexer
       const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
       postMessage(
         roomPda.toBase58(),
@@ -190,29 +251,70 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     return isMe ? `${alias} (you)` : alias;
   };
 
+  const formatCountdown = (expiresAt: number) => {
+    const remaining = expiresAt - now;
+    if (remaining <= 0) return "expiring...";
+    if (remaining < 60) return `${remaining}s`;
+    return `${Math.floor(remaining / 60)}m ${remaining % 60}s`;
+  };
+
   return (
     <div className="flex flex-col h-[400px]">
       <div className="flex-1 overflow-y-auto space-y-2 mb-3 p-2 rounded-lg bg-conclave-dark/50">
-        {loading && <p className="text-conclave-muted text-sm">Loading…</p>}
+        {loading && <p className="text-conclave-muted text-sm">Loading...</p>}
         {messages.map((m) => (
           <div key={m.publicKey || m.timestamp} className="text-sm">
             <span className="text-conclave-accent font-medium">
               {anonName(m.sender)}
             </span>
-            <span className="text-conclave-muted mx-2">·</span>
+            <span className="text-conclave-muted mx-2">&middot;</span>
             <span className="text-gray-300">{m.text}</span>
+            {m.expiresAt && (
+              <span className="ml-2 text-xs text-yellow-400/70" title="Ephemeral message">
+                {formatCountdown(m.expiresAt)}
+              </span>
+            )}
           </div>
         ))}
         <div ref={bottomRef} />
       </div>
       {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
-      <form onSubmit={sendMessage} className="flex gap-2">
+      <form onSubmit={sendMessage} className="flex gap-2 items-center">
+        <button
+          type="button"
+          onClick={() => setEphemeral(!ephemeral)}
+          className={`text-xs px-2 py-1 rounded-md border transition ${
+            ephemeral
+              ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
+              : "border-conclave-border text-conclave-muted hover:text-white"
+          }`}
+          title={ephemeral ? "Ephemeral mode ON — messages self-destruct" : "Enable ephemeral mode"}
+        >
+          {ephemeral ? `${EPHEMERAL_DURATIONS.find((d) => d.seconds === ephemeralDuration)?.label || ""}` : ""}
+        </button>
+        {ephemeral && (
+          <select
+            value={ephemeralDuration}
+            onChange={(e) => setEphemeralDuration(Number(e.target.value))}
+            className="text-xs rounded-md border border-conclave-border bg-conclave-dark text-yellow-400 px-1 py-1"
+          >
+            {EPHEMERAL_DURATIONS.map((d) => (
+              <option key={d.seconds} value={d.seconds}>
+                {d.label}
+              </option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message…"
-          className="flex-1 rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none text-sm"
+          placeholder={ephemeral ? "Ephemeral message..." : "Type a message..."}
+          className={`flex-1 rounded-lg border px-3 py-2 text-white placeholder-conclave-muted focus:outline-none text-sm ${
+            ephemeral
+              ? "border-yellow-400/30 bg-conclave-dark focus:border-yellow-400"
+              : "border-conclave-border bg-conclave-dark focus:border-conclave-accent"
+          }`}
           disabled={!groupKey || sending}
         />
         <button
@@ -220,7 +322,7 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
           disabled={!groupKey || sending}
           className="btn-primary text-sm"
         >
-          {sending ? "…" : "Send"}
+          {sending ? "..." : "Send"}
         </button>
       </form>
     </div>

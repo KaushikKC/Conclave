@@ -395,7 +395,7 @@ app.use(express.json());
 app.use((_req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
   next();
 });
 app.options("*", (_req, res) => res.sendStatus(204));
@@ -448,6 +448,13 @@ app.post("/rooms/:address/messages", (req, res) => {
   const now = Math.floor(Date.now() / 1000);
   upsertMessage.run(address, roomAddress, sender, ciphertext, timestamp, now);
   console.log(`Relayed message ${address} in room ${roomAddress}`);
+  res.json({ ok: true });
+});
+
+// DELETE /messages/:address — remove a message from the indexer DB (called after on-chain close_message)
+app.delete("/messages/:address", (req, res) => {
+  deleteMessage.run(req.params.address);
+  console.log(`Deleted message ${req.params.address} from indexer`);
   res.json({ ok: true });
 });
 

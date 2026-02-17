@@ -13,55 +13,48 @@ export default function HomePage() {
         <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-md hover:bg-white/10 transition-colors cursor-default">
           <div className="h-2 w-2 rounded-full bg-conclave-accent animate-pulse shadow-[0_0_10px_#FF4D8D]"></div>
           <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-conclave-text/80">
-            Solana Governance Protocol
+            Anonymous Governance on Solana
           </span>
         </div>
 
-        {/* Floating Elements (Magnets) - Using slightly randomized rotations and positioning */}
-        {/* Magnet 1: Purple Record - Top Left */}
+        {/* Floating Elements */}
         <div className="absolute top-10 left-0 lg:-left-20 w-24 h-24 md:w-32 md:h-32 bg-[#9D4EDD] rounded-xl transform -rotate-12 shadow-2xl z-20 flex items-center justify-center border border-white/10 hover:scale-110 hover:rotate-0 transition-all duration-500 cursor-pointer group">
           <div className="w-20 h-20 rounded-full border-4 border-black/20 flex items-center justify-center group-hover:animate-spin-slow">
             <div className="w-6 h-6 bg-black/20 rounded-full"></div>
           </div>
         </div>
 
-        {/* Magnet 2: I <3 DAO - Top Right */}
         <div className="absolute top-20 right-0 lg:-right-24 w-28 h-28 md:w-36 md:h-36 bg-conclave-text rounded-sm transform rotate-6 shadow-2xl z-20 flex flex-col items-center justify-center border border-white/10 hover:scale-110 hover:-rotate-3 transition-all duration-500 cursor-pointer">
-          <span className="text-conclave-dark font-black text-xl">I ❤️</span>
+          <span className="text-conclave-dark font-black text-xl">NO</span>
           <span className="text-conclave-dark font-black text-3xl tracking-tighter">
-            PRIVACY
+            BIAS
           </span>
         </div>
 
-        {/* Magnet 3: VOTE - Bottom Left */}
         <div className="absolute bottom-20 left-4 lg:-left-32 w-24 h-24 md:w-40 md:h-32 bg-conclave-card rounded-xl transform rotate-[-6deg] shadow-2xl z-0 flex items-center justify-center border border-white/10 hover:scale-110 hover:rotate-3 transition-all duration-500 cursor-pointer">
           <span className="text-conclave-green font-black text-3xl tracking-widest rotate-[-5deg] border-2 border-conclave-green px-2 py-1 rounded">
-            VOTE
+            ANON
           </span>
         </div>
 
-        {/* Magnet 4: Striped - Bottom Right */}
         <div className="absolute bottom-40 right-4 lg:-right-16 w-20 h-20 md:w-24 md:h-24 bg-conclave-blue rounded-[2rem] transform rotate-12 shadow-2xl z-0 flex items-center justify-center opacity-80 hover:scale-110 hover:rotate-45 transition-all duration-500 cursor-pointer">
           <div className="w-full h-full bg-[linear-gradient(45deg,transparent_25%,rgba(0,0,0,0.2)_25%,rgba(0,0,0,0.2)_50%,transparent_50%,transparent_75%,rgba(0,0,0,0.2)_75%,rgba(0,0,0,0.2)_100%)] bg-[length:10px_10px]"></div>
         </div>
 
-        {/* Main Heading - Massive & Tight */}
+        {/* Main Heading */}
         <h1 className="heading-hero text-conclave-text mb-8 relative z-10 leading-[0.85] select-none mix-blend-screen">
           <span className="block text-[12vw] md:text-[8rem] tracking-tighter">
-            PRIVATE
-          </span>
-          <span className="block text-[12vw] md:text-[8rem] tracking-tighter">
-            VOTING
+            CONCLAVE
           </span>
           <span className="block text-[5vw] md:text-[3rem] text-transparent bg-clip-text bg-gradient-to-r from-conclave-pink via-conclave-yellow to-conclave-blue mt-4 opacity-100 tracking-normal font-bold">
-            FOR DAOS
+            ANONYMOUS DAO WORKSPACE
           </span>
         </h1>
 
         <p className="max-w-xl mx-auto text-sm md:text-base text-conclave-textMuted uppercase tracking-[0.15em] mb-12 font-medium leading-loose">
-          Commit-reveal voting architecture.
+          Where your vote speaks louder than your identity.
           <br />
-          Hidden intent. Zero bias.
+          Private voting. Encrypted chat. Zero surveillance.
         </p>
 
         {!connected ? (
@@ -83,6 +76,46 @@ export default function HomePage() {
             </Link>
           </div>
         )}
+      </section>
+
+      {/* Why Anonymous Governance */}
+      <section className="w-full px-6 mt-24 relative z-10 max-w-5xl mx-auto">
+        <div className="flex items-center gap-4 mb-12 px-4">
+          <div className="w-3 h-3 bg-conclave-pink rounded-full shadow-[0_0_10px_rgba(255,77,141,0.5)]"></div>
+          <h2 className="text-2xl font-black text-conclave-text uppercase tracking-widest">
+            Why anonymity matters
+          </h2>
+          <div className="h-px bg-white/10 flex-1"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <div className="text-3xl mb-4">{">"}</div>
+            <h3 className="text-lg font-bold text-conclave-text mb-3">Eliminate groupthink</h3>
+            <p className="text-sm text-conclave-textMuted leading-relaxed">
+              When votes are visible, members follow the majority. Commit-reveal ensures
+              every vote is independent and unbiased.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <div className="text-3xl mb-4">{"#"}</div>
+            <h3 className="text-lg font-bold text-conclave-text mb-3">Protect whistleblowers</h3>
+            <p className="text-sm text-conclave-textMuted leading-relaxed">
+              Anonymous aliases per room mean your identity is never linked across
+              discussions. Speak freely without fear of retaliation.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <div className="text-3xl mb-4">{"!"}</div>
+            <h3 className="text-lg font-bold text-conclave-text mb-3">On-chain truth</h3>
+            <p className="text-sm text-conclave-textMuted leading-relaxed">
+              Every vote commitment is hashed on Solana. Results are verifiable and
+              tamper-proof. No one can alter the outcome.
+            </p>
+          </div>
+        </div>
       </section>
 
       {/* How it works Section - Grid Style */}
@@ -107,11 +140,11 @@ export default function HomePage() {
                 Create
               </h3>
               <p className="text-xs text-conclave-textMuted leading-relaxed tracking-wide uppercase">
-                Start a room.
+                Start a token-gated room.
                 <br />
-                Token-gated entry.
+                Share an invite link.
                 <br />
-                Set your rules.
+                Members join anonymously.
               </p>
             </div>
           </div>
@@ -127,11 +160,11 @@ export default function HomePage() {
                 Discuss
               </h3>
               <p className="text-xs text-conclave-textMuted leading-relaxed tracking-wide uppercase">
-                Encrypted chat.
+                End-to-end encrypted chat.
                 <br />
-                Members only.
+                Self-destructing messages.
                 <br />
-                Zero leaks.
+                Anonymous aliases.
               </p>
             </div>
           </div>
@@ -147,11 +180,11 @@ export default function HomePage() {
                 Vote
               </h3>
               <p className="text-xs text-conclave-textMuted leading-relaxed tracking-wide uppercase">
-                Commit hash.
+                Commit a secret hash.
                 <br />
-                Secret intent.
+                No one sees your intent.
                 <br />
-                Wait for it.
+                Zero influence, zero bias.
               </p>
             </div>
           </div>
@@ -167,14 +200,71 @@ export default function HomePage() {
                 Reveal
               </h3>
               <p className="text-xs text-conclave-textMuted leading-relaxed tracking-wide uppercase">
-                Decrypt votes.
+                Deadline passes. Reveal.
                 <br />
-                Tally results.
+                On-chain tally.
                 <br />
-                On-chain truth.
+                Verifiable on Explorer.
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Use Cases */}
+      <section className="w-full px-6 mt-32 relative z-10 max-w-5xl mx-auto mb-20">
+        <div className="flex items-center gap-4 mb-12 px-4">
+          <div className="w-3 h-3 bg-conclave-yellow rounded-full shadow-[0_0_10px_rgba(255,204,0,0.5)]"></div>
+          <h2 className="text-2xl font-black text-conclave-text uppercase tracking-widest">
+            Built for
+          </h2>
+          <div className="h-px bg-white/10 flex-1"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-4">
+          <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">DAOs with sensitive votes</h3>
+            <p className="text-xs text-conclave-textMuted leading-relaxed">
+              Treasury allocations, hiring decisions, protocol upgrades — votes that
+              should be free from whale pressure and social dynamics.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Whistleblower coordination</h3>
+            <p className="text-xs text-conclave-textMuted leading-relaxed">
+              Anonymous encrypted channels where identity can never be linked.
+              Different alias in every room. Self-destructing messages.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Private governance councils</h3>
+            <p className="text-xs text-conclave-textMuted leading-relaxed">
+              Token-gated rooms ensure only stakeholders participate.
+              Encrypted discussions stay within the group. No leaks.
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Fair community decisions</h3>
+            <p className="text-xs text-conclave-textMuted leading-relaxed">
+              Commit-reveal prevents bandwagon voting. Every member's voice carries
+              equal weight, regardless of social standing.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Tech Stack Footer */}
+      <section className="w-full px-6 relative z-10 max-w-5xl mx-auto mb-10">
+        <div className="flex flex-wrap justify-center gap-4 text-[10px] uppercase tracking-[0.2em] text-conclave-textMuted/50">
+          <span>Solana</span>
+          <span>&middot;</span>
+          <span>Anchor</span>
+          <span>&middot;</span>
+          <span>NaCl Encryption</span>
+          <span>&middot;</span>
+          <span>Commit-Reveal</span>
+          <span>&middot;</span>
+          <span>Token-Gated</span>
         </div>
       </section>
     </div>
