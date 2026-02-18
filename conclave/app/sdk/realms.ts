@@ -1,71 +1,109 @@
-import { Connection, PublicKey, TransactionInstruction } from "@solana/web3.js";
-import * as anchor from "@coral-xyz/anchor";
+import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  getRealm,
+  getTokenOwnerRecordForRealm,
+  getAllGovernances,
+  getAllProposals,
+  ProposalState,
+} from "@realms-today/spl-governance";
 
 /**
  * Conclave <-> Realms Integration SDK
  *
- * Integrates with SPL Governance (Realms) by:
- * 1. Verifying DAO membership via TokenOwnerRecord
- * 2. Deriving governance token mint from a Realm
- * 3. Providing helpers to create Conclave rooms linked to Realms DAOs
+ * Uses the official @realms-today/spl-governance SDK.
  *
  * SPL Governance Program ID (mainnet/devnet):
  * GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw
  */
 
-const SPL_GOVERNANCE_PROGRAM_ID = new PublicKey(
+export const SPL_GOVERNANCE_PROGRAM_ID = new PublicKey(
   "GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"
 );
+
+/** Mainnet RPC for fetching real Realms DAO data */
+const MAINNET_RPC = "https://api.mainnet-beta.solana.com";
+
+let _mainnetConnection: Connection | null = null;
+export function getMainnetConnection(): Connection {
+  if (!_mainnetConnection) {
+    _mainnetConnection = new Connection(MAINNET_RPC, "confirmed");
+  }
+  return _mainnetConnection;
+}
 
 export interface RealmInfo {
   realmAddress: PublicKey;
   communityMint: PublicKey;
   councilMint: PublicKey | null;
   name: string;
+  authority: PublicKey | null;
+  votingProposalCount: number;
 }
 
 export interface TokenOwnerRecordInfo {
   realm: PublicKey;
   governingTokenMint: PublicKey;
   governingTokenOwner: PublicKey;
-  governingTokenDepositAmount: anchor.BN;
+  governingTokenDepositAmount: { gt: (n: any) => boolean; gtn: (n: number) => boolean; toNumber: () => number };
+  totalVotesCount: number;
+}
+
+export interface RealmsProposalInfo {
+  pubkey: PublicKey;
+  name: string;
+  descriptionLink: string;
+  state: ProposalState;
+  yesVotes: number;
+  noVotes: number;
+  draftAt: number;
+  votingAt: number | null;
+  votingCompletedAt: number | null;
+  governance: PublicKey;
+}
+
+export interface RealmsGovernanceInfo {
+  pubkey: PublicKey;
+  governedAccount: PublicKey;
+  proposalCount: number;
+  votingTime: number;
 }
 
 /**
- * Derive the Realm PDA address.
+ * Fetch realm info using official SDK.
+ * Tries the provided connection first, falls back to mainnet.
  */
-export function getRealmAddress(name: string): PublicKey {
-  const [address] = PublicKey.findProgramAddressSync(
-    [Buffer.from("governance"), Buffer.from(name)],
-    SPL_GOVERNANCE_PROGRAM_ID
-  );
-  return address;
+export async function fetchRealmInfo(
+  connection: Connection,
+  realmAddress: PublicKey
+): Promise<RealmInfo | null> {
+  // Try provided connection first (devnet), then mainnet
+  const connections = [connection];
+  const mainnet = getMainnetConnection();
+  if (connection.rpcEndpoint !== mainnet.rpcEndpoint) {
+    connections.push(mainnet);
+  }
+
+  for (const conn of connections) {
+    try {
+      const realm = await getRealm(conn, realmAddress);
+      return {
+        realmAddress,
+        communityMint: realm.account.communityMint,
+        councilMint: realm.account.config.councilMint || null,
+        name: realm.account.name,
+        authority: realm.account.authority || null,
+        votingProposalCount: realm.account.votingProposalCount,
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 /**
- * Derive the TokenOwnerRecord PDA for a given realm, mint, and wallet.
- * This record proves that a wallet is a member of a Realms DAO.
- */
-export function getTokenOwnerRecordAddress(
-  realm: PublicKey,
-  governingTokenMint: PublicKey,
-  governingTokenOwner: PublicKey
-): PublicKey {
-  const [address] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("governance"),
-      realm.toBuffer(),
-      governingTokenMint.toBuffer(),
-      governingTokenOwner.toBuffer(),
-    ],
-    SPL_GOVERNANCE_PROGRAM_ID
-  );
-  return address;
-}
-
-/**
- * Fetch and verify that a wallet has a TokenOwnerRecord in the given Realm.
- * Returns the record info if found, null if the wallet is not a member.
+ * Verify that a wallet has a TokenOwnerRecord in the given Realm.
+ * Uses official SDK deserialization.
  */
 export async function verifyRealmsMembership(
   connection: Connection,
@@ -73,117 +111,120 @@ export async function verifyRealmsMembership(
   governingTokenMint: PublicKey,
   wallet: PublicKey
 ): Promise<TokenOwnerRecordInfo | null> {
-  const torAddress = getTokenOwnerRecordAddress(
-    realm,
-    governingTokenMint,
-    wallet
-  );
-
-  const accountInfo = await connection.getAccountInfo(torAddress);
-  if (!accountInfo || accountInfo.data.length === 0) {
-    return null;
+  const connections = [connection];
+  const mainnet = getMainnetConnection();
+  if (connection.rpcEndpoint !== mainnet.rpcEndpoint) {
+    connections.push(mainnet);
   }
 
-  // TokenOwnerRecord layout (simplified — key fields):
-  // 0: account_type (1 byte)
-  // 1-32: realm (32 bytes)
-  // 33-64: governing_token_mint (32 bytes)
-  // 65-96: governing_token_owner (32 bytes)
-  // 97-104: governing_token_deposit_amount (u64, 8 bytes)
-  const data = accountInfo.data;
-  const realmPubkey = new PublicKey(data.slice(1, 33));
-  const mint = new PublicKey(data.slice(33, 65));
-  const owner = new PublicKey(data.slice(65, 97));
-  const depositAmount = new anchor.BN(data.slice(97, 105), "le");
-
-  return {
-    realm: realmPubkey,
-    governingTokenMint: mint,
-    governingTokenOwner: owner,
-    governingTokenDepositAmount: depositAmount,
-  };
+  for (const conn of connections) {
+    try {
+      const record = await getTokenOwnerRecordForRealm(
+        conn,
+        SPL_GOVERNANCE_PROGRAM_ID,
+        realm,
+        governingTokenMint,
+        wallet
+      );
+      return {
+        realm: record.account.realm,
+        governingTokenMint: record.account.governingTokenMint,
+        governingTokenOwner: record.account.governingTokenOwner,
+        governingTokenDepositAmount: record.account.governingTokenDepositAmount,
+        totalVotesCount: record.account.totalVotesCount,
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
 
 /**
- * Fetch realm info including community and council mints.
+ * Fetch all governances for a Realm.
  */
-export async function fetchRealmInfo(
+export async function fetchRealmsGovernances(
   connection: Connection,
   realmAddress: PublicKey
-): Promise<RealmInfo | null> {
-  const accountInfo = await connection.getAccountInfo(realmAddress);
-  if (!accountInfo || accountInfo.data.length === 0) {
-    return null;
+): Promise<RealmsGovernanceInfo[]> {
+  const connections = [connection];
+  const mainnet = getMainnetConnection();
+  if (connection.rpcEndpoint !== mainnet.rpcEndpoint) {
+    connections.push(mainnet);
   }
 
-  // Realm layout (simplified):
-  // 0: account_type (1 byte)
-  // 1-4: name_length (u32)
-  // 4+name_length: community_mint (32 bytes)
-  // ... config ...
-  // council_mint is optional
-  const data = accountInfo.data;
-  const nameLen = data.readUInt32LE(1);
-  const name = data.slice(5, 5 + nameLen).toString("utf8");
-  const communityMint = new PublicKey(data.slice(5 + nameLen, 5 + nameLen + 32));
-
-  // Council mint presence depends on config — simplified for hackathon
-  return {
-    realmAddress,
-    communityMint,
-    councilMint: null,
-    name,
-  };
+  for (const conn of connections) {
+    try {
+      const governances = await getAllGovernances(
+        conn,
+        SPL_GOVERNANCE_PROGRAM_ID,
+        realmAddress
+      );
+      return governances.map((g) => ({
+        pubkey: g.pubkey,
+        governedAccount: g.account.governedAccount,
+        proposalCount: g.account.proposalCount,
+        votingTime: g.account.config.baseVotingTime,
+      }));
+    } catch {
+      continue;
+    }
+  }
+  return [];
 }
 
 /**
- * Derive the Governance PDA for a given realm and governed account.
+ * Fetch all proposals for a Realm across all governances.
+ * Returns them flattened and sorted by most recent first.
  */
-export function getGovernanceAddress(
-  realm: PublicKey,
-  governedAccount: PublicKey
-): PublicKey {
-  const [address] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("account-governance"),
-      realm.toBuffer(),
-      governedAccount.toBuffer(),
-    ],
-    SPL_GOVERNANCE_PROGRAM_ID
-  );
-  return address;
+export async function fetchRealmsProposals(
+  connection: Connection,
+  realmAddress: PublicKey
+): Promise<RealmsProposalInfo[]> {
+  const connections = [connection];
+  const mainnet = getMainnetConnection();
+  if (connection.rpcEndpoint !== mainnet.rpcEndpoint) {
+    connections.push(mainnet);
+  }
+
+  for (const conn of connections) {
+    try {
+      const proposalsByGov = await getAllProposals(
+        conn,
+        SPL_GOVERNANCE_PROGRAM_ID,
+        realmAddress
+      );
+      // getAllProposals returns Proposal[][] (one array per governance)
+      const flat = proposalsByGov.flat();
+      const mapped = flat.map((p) => ({
+        pubkey: p.pubkey,
+        name: p.account.name,
+        descriptionLink: p.account.descriptionLink,
+        state: p.account.state,
+        yesVotes: p.account.getYesVoteCount().toNumber(),
+        noVotes: p.account.getNoVoteCount().toNumber(),
+        draftAt: p.account.draftAt.toNumber(),
+        votingAt: p.account.votingAt?.toNumber() ?? null,
+        votingCompletedAt: p.account.votingCompletedAt?.toNumber() ?? null,
+        governance: p.account.governance,
+      }));
+      // Sort: voting first, then by most recent
+      mapped.sort((a, b) => {
+        const aActive = a.state === ProposalState.Voting ? 1 : 0;
+        const bActive = b.state === ProposalState.Voting ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return b.draftAt - a.draftAt;
+      });
+      return mapped;
+    } catch {
+      continue;
+    }
+  }
+  return [];
 }
 
 /**
- * Derive the Proposal PDA for a Realms governance proposal.
- */
-export function getRealmsProposalAddress(
-  governance: PublicKey,
-  governingTokenMint: PublicKey,
-  proposalIndex: number
-): PublicKey {
-  const indexBuffer = Buffer.alloc(4);
-  indexBuffer.writeUInt32LE(proposalIndex);
-  const [address] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("governance"),
-      governance.toBuffer(),
-      governingTokenMint.toBuffer(),
-      indexBuffer,
-    ],
-    SPL_GOVERNANCE_PROGRAM_ID
-  );
-  return address;
-}
-
-/**
- * Full flow: Create a Conclave room linked to a Realms DAO.
- *
- * 1. Fetch the Realm to get the community mint
- * 2. Verify the creator is a member of the Realm
- * 3. Use the community mint as the governance_mint for the Conclave room
- *
- * Returns the governance mint to use with create_room.
+ * Full flow: get governance mint from a Realm and verify membership.
  */
 export async function getGovernanceMintForRealm(
   connection: Connection,
@@ -204,6 +245,9 @@ export async function getGovernanceMintForRealm(
 
   return {
     governanceMint: realm.communityMint,
-    isVerifiedMember: membership !== null && membership.governingTokenDepositAmount.gt(new anchor.BN(0)),
+    isVerifiedMember: membership !== null && membership.governingTokenDepositAmount.gtn(0),
   };
 }
+
+// Re-export useful types from the SDK
+export { ProposalState } from "@realms-today/spl-governance";

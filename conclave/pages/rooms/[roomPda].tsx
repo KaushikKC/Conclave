@@ -15,6 +15,7 @@ import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getMemberPda } from "../../lib/conclave";
 import ChatRoom from "../../components/ChatRoom";
 import MemberList from "../../components/MemberList";
+import RealmsGovernance from "../../components/RealmsGovernance";
 import {
   fetchRoom,
   fetchRoomMembers,
@@ -29,7 +30,7 @@ import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
-type Tab = "chat" | "proposals" | "members";
+type Tab = "chat" | "proposals" | "members" | "realms";
 
 interface RoomData {
   name: string;
@@ -537,7 +538,7 @@ export default function RoomDetailPage() {
       )}
 
       <div className="flex gap-2 border-b border-conclave-border mb-6">
-        {(["chat", "proposals", "members"] as const).map((t) => (
+        {(["chat", "proposals", "members", ...(room.realmAddress ? ["realms" as const] : [])] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -550,6 +551,7 @@ export default function RoomDetailPage() {
             {t === "chat" && "Chat"}
             {t === "proposals" && "Proposals"}
             {t === "members" && "Members"}
+            {t === "realms" && "Realms DAO"}
           </button>
         ))}
       </div>
@@ -579,6 +581,13 @@ export default function RoomDetailPage() {
         <div className="card">
           <h2 className="font-semibold text-white mb-4">Members</h2>
           <MemberList roomPda={roomPubkey} />
+        </div>
+      )}
+
+      {tab === "realms" && room.realmAddress && (
+        <div className="card">
+          <h2 className="font-semibold text-white mb-4">Realms Governance</h2>
+          <RealmsGovernance realmAddress={room.realmAddress} />
         </div>
       )}
     </div>
