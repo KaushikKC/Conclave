@@ -25,6 +25,7 @@ import {
   notifyIndexer,
   ApiProposal,
 } from "../../lib/api";
+import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
@@ -36,6 +37,7 @@ interface RoomData {
   governanceMint: string;
   memberCount: number;
   proposalCount: number;
+  realmAddress: string | null;
 }
 
 export default function RoomDetailPage() {
@@ -53,6 +55,8 @@ export default function RoomDetailPage() {
   const [groupKey, setGroupKey] = useState<Uint8Array | null>(null);
   const [publishKeyLoading, setPublishKeyLoading] = useState(false);
   const [publishKeyDone, setPublishKeyDone] = useState(false);
+  const [realmName, setRealmName] = useState<string | null>(null);
+  const [realmMemberVerified, setRealmMemberVerified] = useState<boolean | null>(null);
 
   const inviteKey = typeof router.query.key === "string" ? router.query.key : null;
   const roomPda = typeof roomPdaStr === "string" ? roomPdaStr : null;
@@ -73,6 +77,7 @@ export default function RoomDetailPage() {
           governanceMint: data.governance_mint,
           memberCount: data.member_count,
           proposalCount: data.proposal_count,
+          realmAddress: data.realm_address || null,
         });
       } catch {
         if (cancelled) {
@@ -92,6 +97,7 @@ export default function RoomDetailPage() {
               governanceMint: acc.governanceMint.toBase58(),
               memberCount: acc.memberCount,
               proposalCount: acc.proposalCount,
+              realmAddress: null,
             });
           } catch {
             if (!cancelled) setRoom(null);
@@ -142,6 +148,36 @@ export default function RoomDetailPage() {
       cancelled = true;
     };
   }, [roomPda, wallet, programReadOnly, connection]);
+
+  // Fetch Realm info if room is linked to a Realms DAO
+  useEffect(() => {
+    if (!room?.realmAddress || !wallet) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const realmPubkey = new PublicKey(room.realmAddress!);
+        const info = await fetchRealmInfo(connection, realmPubkey);
+        if (cancelled) return;
+        if (info) {
+          setRealmName(info.name);
+          const membership = await verifyRealmsMembership(
+            connection,
+            realmPubkey,
+            info.communityMint,
+            wallet,
+          );
+          if (!cancelled) {
+            setRealmMemberVerified(
+              membership !== null && membership.governingTokenDepositAmount.gtn(0),
+            );
+          }
+        }
+      } catch {
+        // Non-fatal
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [room?.realmAddress, wallet, connection]);
 
   // Load group key from localStorage, invite link, or indexer.
   // If creator has key locally but indexer doesn't, auto-republish it.
@@ -351,16 +387,51 @@ export default function RoomDetailPage() {
         </Link>
         <div className="card">
           <h1 className="text-2xl font-bold text-white mb-2">{room.name}</h1>
+          {room.realmAddress && realmName && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
+                Realms DAO
+              </span>
+              <a
+                href={`https://app.realms.today/dao/${room.realmAddress}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-conclave-accent hover:underline"
+              >
+                {realmName} &rarr;
+              </a>
+            </div>
+          )}
           <p className="text-conclave-muted text-sm mb-4">
             {room.memberCount} members · {room.proposalCount} proposals
           </p>
-          <p className="text-xs text-conclave-muted font-mono mb-6 break-all">
+          <p className="text-xs text-conclave-muted font-mono mb-4 break-all">
             Governance mint: {room.governanceMint}
           </p>
 
-          <p className="text-sm text-gray-300 mb-4">
-            You need at least 1 governance token to join.
-          </p>
+          {room.realmAddress && realmName ? (
+            <div className="mb-4">
+              <p className="text-sm text-gray-300 mb-2">
+                This room requires membership in <span className="text-white font-medium">{realmName}</span> DAO.
+              </p>
+              {realmMemberVerified === true && (
+                <p className="text-xs text-green-400 flex items-center gap-1 mb-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-green-400"></span>
+                  Verified Realms DAO member
+                </p>
+              )}
+              {realmMemberVerified === false && (
+                <p className="text-xs text-yellow-400 flex items-center gap-1 mb-2">
+                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
+                  Not a member of this Realm — you still need the governance token to join
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-300 mb-4">
+              You need at least 1 governance token to join.
+            </p>
+          )}
           {joinError && (
             <p className="text-red-400 text-sm mb-3">{joinError}</p>
           )}
@@ -414,8 +485,18 @@ export default function RoomDetailPage() {
       >
         ← Rooms
       </Link>
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex items-center gap-4 mb-4">
         <h1 className="text-2xl font-bold text-white">{room.name}</h1>
+        {room.realmAddress && (
+          <a
+            href={`https://app.realms.today/dao/${room.realmAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium hover:bg-purple-500/30 transition"
+          >
+            {realmName ? `${realmName}` : "Realms DAO"} &rarr;
+          </a>
+        )}
         {groupKey && (
           <button
             onClick={copyInviteLink}

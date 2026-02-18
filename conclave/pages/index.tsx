@@ -13,7 +13,7 @@ export default function HomePage() {
         <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-md hover:bg-white/10 transition-colors cursor-default">
           <div className="h-2 w-2 rounded-full bg-conclave-accent animate-pulse shadow-[0_0_10px_#FF4D8D]"></div>
           <span className="text-[10px] uppercase tracking-[0.25em] font-bold text-conclave-text/80">
-            Anonymous Governance on Solana
+            Built on Realms &times; Solana
           </span>
         </div>
 
@@ -109,10 +109,10 @@ export default function HomePage() {
 
           <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
             <div className="text-3xl mb-4">{"!"}</div>
-            <h3 className="text-lg font-bold text-conclave-text mb-3">On-chain truth</h3>
+            <h3 className="text-lg font-bold text-conclave-text mb-3">Extends Realms</h3>
             <p className="text-sm text-conclave-textMuted leading-relaxed">
-              Every vote commitment is hashed on Solana. Results are verifiable and
-              tamper-proof. No one can alter the outcome.
+              Extends your Realms DAO with private voting and encrypted discussion.
+              Link any Realms governance to get anonymous, verifiable decision-making.
             </p>
           </div>
         </div>
@@ -223,10 +223,10 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-4">
           <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
-            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">DAOs with sensitive votes</h3>
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Realms DAOs with sensitive votes</h3>
             <p className="text-xs text-conclave-textMuted leading-relaxed">
-              Treasury allocations, hiring decisions, protocol upgrades — votes that
-              should be free from whale pressure and social dynamics.
+              Link your Realms DAO for treasury allocations, hiring decisions, protocol
+              upgrades — votes free from whale pressure and social dynamics.
             </p>
           </div>
           <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
@@ -237,10 +237,10 @@ export default function HomePage() {
             </p>
           </div>
           <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
-            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Private governance councils</h3>
+            <h3 className="text-sm font-bold text-conclave-text uppercase tracking-widest mb-2">Private Realms governance</h3>
             <p className="text-xs text-conclave-textMuted leading-relaxed">
-              Token-gated rooms ensure only stakeholders participate.
-              Encrypted discussions stay within the group. No leaks.
+              Realms-verified rooms ensure only DAO members participate.
+              Encrypted discussions stay within the governance group. No leaks.
             </p>
           </div>
           <div className="rounded-xl border border-white/10 p-6 bg-white/[0.02] hover:bg-white/5 transition-all">
@@ -256,6 +256,8 @@ export default function HomePage() {
       {/* Tech Stack Footer */}
       <section className="w-full px-6 relative z-10 max-w-5xl mx-auto mb-10">
         <div className="flex flex-wrap justify-center gap-4 text-[10px] uppercase tracking-[0.2em] text-conclave-textMuted/50">
+          <span>Powered by Realms</span>
+          <span>&middot;</span>
           <span>Solana</span>
           <span>&middot;</span>
           <span>Anchor</span>

@@ -30,7 +30,8 @@ db.exec(`
     member_count INTEGER DEFAULT 0,
     proposal_count INTEGER DEFAULT 0,
     created_at INTEGER NOT NULL,
-    indexed_at INTEGER NOT NULL
+    indexed_at INTEGER NOT NULL,
+    realm_address TEXT
   );
 
   CREATE TABLE IF NOT EXISTS members (
@@ -101,6 +102,13 @@ db.exec(`
     PRIMARY KEY (proposal, voter)
   );
 `);
+
+// Migration: add realm_address column to existing DBs
+try {
+  db.exec(`ALTER TABLE rooms ADD COLUMN realm_address TEXT`);
+} catch {
+  // Column already exists
+}
 
 // --- Prepared Statements ---
 
@@ -415,6 +423,21 @@ app.get("/rooms/:address", (req, res) => {
     .get(req.params.address);
   if (!room) return res.status(404).json({ error: "Room not found" });
   res.json(room);
+});
+
+// POST /rooms/:address/realm — link a room to a Realms DAO
+app.post("/rooms/:address/realm", (req, res) => {
+  const { realmAddress } = req.body;
+  if (!realmAddress || typeof realmAddress !== "string") {
+    return res.status(400).json({ error: "realmAddress (string) required" });
+  }
+  const roomAddress = req.params.address;
+  db.prepare("UPDATE rooms SET realm_address = ? WHERE address = ?").run(
+    realmAddress,
+    roomAddress,
+  );
+  console.log(`Linked room ${roomAddress} to realm ${realmAddress}`);
+  res.json({ ok: true });
 });
 
 // GET /rooms/:address/members

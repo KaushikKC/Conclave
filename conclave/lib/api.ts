@@ -20,6 +20,7 @@ export interface ApiRoom {
   proposal_count: number;
   created_at: number;
   indexed_at: number;
+  realm_address: string | null;
 }
 
 export interface ApiMember {
@@ -202,6 +203,22 @@ export async function notifyIndexer(accounts: string[]): Promise<void> {
     });
   } catch {
     // Non-fatal — indexer will pick it up on next poll
+  }
+}
+
+/** Link a room to a Realms DAO address in the indexer */
+export async function postRoomRealm(
+  roomAddress: string,
+  realmAddress: string,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/rooms/${roomAddress}/realm`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ realmAddress }),
+    });
+  } catch {
+    // Non-fatal
   }
 }
 

@@ -13,6 +13,7 @@ interface RoomItem {
   memberCount: number;
   proposalCount: number;
   createdAt: number;
+  realmAddress: string | null;
 }
 
 function mapApiRoom(r: ApiRoom): RoomItem {
@@ -24,6 +25,7 @@ function mapApiRoom(r: ApiRoom): RoomItem {
     memberCount: r.member_count,
     proposalCount: r.proposal_count,
     createdAt: r.created_at,
+    realmAddress: r.realm_address || null,
   };
 }
 
@@ -54,6 +56,7 @@ export default function RoomsListPage() {
               memberCount: acc.account.memberCount ?? 0,
               proposalCount: acc.account.proposalCount ?? 0,
               createdAt: Number(acc.account.createdAt ?? 0),
+              realmAddress: null,
             })),
           );
           if (cancelled) return;
@@ -99,7 +102,14 @@ export default function RoomsListPage() {
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <h2 className="font-semibold text-white">{room.name}</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-semibold text-white">{room.name}</h2>
+                      {room.realmAddress && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
+                          Realms
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-conclave-muted mt-1">
                       {room.memberCount} members · {room.proposalCount}{" "}
                       proposals
@@ -108,7 +118,7 @@ export default function RoomsListPage() {
                       Mint: {room.governanceMint}
                     </p>
                   </div>
-                  <span className="text-conclave-accent text-sm">Open →</span>
+                  <span className="text-conclave-accent text-sm">Open &rarr;</span>
                 </div>
               </Link>
             </li>
