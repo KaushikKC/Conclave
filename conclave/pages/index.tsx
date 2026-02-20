@@ -6,9 +6,9 @@ export default function HomePage() {
   const { connected } = useWallet();
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center overflow-auto pb-20 pt-20">
+    <div className="relative min-h-screen flex flex-col items-center overflow-auto pb-10 sm:pb-20 pt-10 sm:pt-20">
       {/* Hero Section Container */}
-      <section className="relative w-full max-w-5xl mx-auto px-6 flex flex-col items-center text-center z-10 py-20">
+      <section className="relative w-full max-w-5xl mx-auto px-4 sm:px-6 flex flex-col items-center text-center z-10 py-10 sm:py-20">
         {/* Pill Badge */}
         <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-md hover:bg-white/10 transition-colors cursor-default">
           <div className="h-2 w-2 rounded-full bg-conclave-accent animate-pulse shadow-[0_0_10px_#FF4D8D]"></div>
@@ -17,27 +17,27 @@ export default function HomePage() {
           </span>
         </div>
 
-        {/* Floating Elements */}
-        <div className="absolute top-10 left-0 lg:-left-20 w-24 h-24 md:w-32 md:h-32 bg-[#9D4EDD] rounded-xl transform -rotate-12 shadow-2xl z-20 flex items-center justify-center border border-white/10 hover:scale-110 hover:rotate-0 transition-all duration-500 cursor-pointer group">
+        {/* Floating Elements — hidden on small screens to avoid overflow */}
+        <div className="hidden md:flex absolute top-10 left-0 lg:-left-20 w-24 h-24 md:w-32 md:h-32 bg-[#9D4EDD] rounded-xl transform -rotate-12 shadow-2xl z-20 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-0 transition-all duration-500 cursor-pointer group">
           <div className="w-20 h-20 rounded-full border-4 border-black/20 flex items-center justify-center group-hover:animate-spin-slow">
             <div className="w-6 h-6 bg-black/20 rounded-full"></div>
           </div>
         </div>
 
-        <div className="absolute top-20 right-0 lg:-right-24 w-28 h-28 md:w-36 md:h-36 bg-conclave-text rounded-sm transform rotate-6 shadow-2xl z-20 flex flex-col items-center justify-center border border-white/10 hover:scale-110 hover:-rotate-3 transition-all duration-500 cursor-pointer">
+        <div className="hidden md:flex absolute top-20 right-0 lg:-right-24 w-28 h-28 md:w-36 md:h-36 bg-conclave-text rounded-sm transform rotate-6 shadow-2xl z-20 flex-col items-center justify-center border border-white/10 hover:scale-110 hover:-rotate-3 transition-all duration-500 cursor-pointer">
           <span className="text-conclave-dark font-black text-xl">NO</span>
           <span className="text-conclave-dark font-black text-3xl tracking-tighter">
             BIAS
           </span>
         </div>
 
-        <div className="absolute bottom-20 left-4 lg:-left-32 w-24 h-24 md:w-40 md:h-32 bg-conclave-card rounded-xl transform rotate-[-6deg] shadow-2xl z-0 flex items-center justify-center border border-white/10 hover:scale-110 hover:rotate-3 transition-all duration-500 cursor-pointer">
+        <div className="hidden lg:flex absolute bottom-20 left-4 lg:-left-32 w-24 h-24 md:w-40 md:h-32 bg-conclave-card rounded-xl transform rotate-[-6deg] shadow-2xl z-0 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-3 transition-all duration-500 cursor-pointer">
           <span className="text-conclave-green font-black text-3xl tracking-widest rotate-[-5deg] border-2 border-conclave-green px-2 py-1 rounded">
             ANON
           </span>
         </div>
 
-        <div className="absolute bottom-40 right-4 lg:-right-16 w-20 h-20 md:w-24 md:h-24 bg-conclave-blue rounded-[2rem] transform rotate-12 shadow-2xl z-0 flex items-center justify-center opacity-80 hover:scale-110 hover:rotate-45 transition-all duration-500 cursor-pointer">
+        <div className="hidden lg:flex absolute bottom-40 right-4 lg:-right-16 w-20 h-20 md:w-24 md:h-24 bg-conclave-blue rounded-[2rem] transform rotate-12 shadow-2xl z-0 items-center justify-center opacity-80 hover:scale-110 hover:rotate-45 transition-all duration-500 cursor-pointer">
           <div className="w-full h-full bg-[linear-gradient(45deg,transparent_25%,rgba(0,0,0,0.2)_25%,rgba(0,0,0,0.2)_50%,transparent_50%,transparent_75%,rgba(0,0,0,0.2)_75%,rgba(0,0,0,0.2)_100%)] bg-[length:10px_10px]"></div>
         </div>
 
@@ -118,6 +118,118 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Live Demo Preview */}
+      <section className="w-full px-6 mt-32 relative z-10 max-w-6xl mx-auto">
+        <div className="flex items-center gap-4 mb-12 px-4">
+          <div className="w-3 h-3 bg-conclave-blue rounded-full shadow-[0_0_10px_rgba(0,184,241,0.5)]"></div>
+          <h2 className="text-2xl font-black text-conclave-text uppercase tracking-widest">
+            See it in action
+          </h2>
+          <div className="h-px bg-white/10 flex-1"></div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
+          {/* Anonymous Voting Demo */}
+          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
+              <span className="text-[10px] text-conclave-textMuted ml-2 uppercase tracking-widest">Anonymous Voting</span>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-white">Increase Treasury Budget?</h4>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-medium animate-pulse">Voting</span>
+              </div>
+              <p className="text-xs text-conclave-textMuted">Proposal to allocate 50k USDC to dev grants</p>
+              {/* Vote progress */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-green-400 font-medium">Yes 73%</span>
+                  <span className="text-red-400 font-medium">No 27%</span>
+                </div>
+                <div className="h-2.5 bg-conclave-dark rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-1000" style={{width: "73%"}}></div>
+                </div>
+                <p className="text-[10px] text-conclave-textMuted">11 votes cast &middot; 3 pending reveal</p>
+              </div>
+              {/* Commit-reveal explanation */}
+              <div className="flex gap-2 pt-2">
+                <div className="flex-1 rounded-lg border border-conclave-border p-2.5 text-center">
+                  <div className="text-[10px] text-conclave-textMuted uppercase tracking-wider mb-1">Phase 1</div>
+                  <div className="text-xs font-bold text-conclave-yellow">Commit</div>
+                  <div className="text-[10px] text-conclave-textMuted mt-0.5">Hash your vote</div>
+                </div>
+                <div className="flex-1 rounded-lg border border-conclave-border p-2.5 text-center">
+                  <div className="text-[10px] text-conclave-textMuted uppercase tracking-wider mb-1">Phase 2</div>
+                  <div className="text-xs font-bold text-conclave-blue">Reveal</div>
+                  <div className="text-[10px] text-conclave-textMuted mt-0.5">After deadline</div>
+                </div>
+                <div className="flex-1 rounded-lg border border-conclave-border p-2.5 text-center">
+                  <div className="text-[10px] text-conclave-textMuted uppercase tracking-wider mb-1">Phase 3</div>
+                  <div className="text-xs font-bold text-conclave-green">Result</div>
+                  <div className="text-[10px] text-conclave-textMuted mt-0.5">On-chain tally</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Encrypted Chat Demo */}
+          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
+              <span className="text-[10px] text-conclave-textMuted ml-2 uppercase tracking-widest">Encrypted Chat</span>
+            </div>
+            <div className="p-5 space-y-3">
+              {/* Chat messages */}
+              <div className="text-sm">
+                <span className="text-conclave-pink font-medium">Mystic Owl</span>
+                <span className="text-conclave-textMuted mx-2">&middot;</span>
+                <span className="text-conclave-text/80">I think we should allocate more to security audits</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-conclave-blue font-medium">Silent Fox</span>
+                <span className="text-conclave-textMuted mx-2">&middot;</span>
+                <span className="text-conclave-text/80">Agreed. The last audit found critical issues we missed.</span>
+              </div>
+              <div className="text-sm">
+                <span className="text-conclave-green font-medium">Ghost Bear</span>
+                <span className="text-conclave-textMuted mx-2">&middot;</span>
+                <span className="text-conclave-text/80">What about splitting 60/40 between audits and grants?</span>
+              </div>
+              <div className="text-sm flex items-center gap-2">
+                <span className="text-conclave-yellow font-medium">Phantom Wolf</span>
+                <span className="text-conclave-textMuted">&middot;</span>
+                <span className="text-conclave-text/80">Good compromise.</span>
+                <span className="text-[10px] text-yellow-400/70">42s</span>
+              </div>
+              {/* Encryption badge */}
+              <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[10px] text-conclave-textMuted">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></div>
+                  <span>End-to-end encrypted &middot; NaCl</span>
+                </div>
+                <div className="text-[10px] text-conclave-textMuted">
+                  Anonymous aliases per room
+                </div>
+              </div>
+              {/* Input mockup */}
+              <div className="flex gap-2 mt-1">
+                <div className="flex-1 rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-xs text-conclave-textMuted">
+                  Type a message...
+                </div>
+                <div className="rounded-lg bg-conclave-text/10 px-3 py-2 text-xs text-conclave-textMuted">
+                  Send
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* How it works Section - Grid Style */}
       <section className="w-full px-6 mt-32 relative z-10 max-w-7xl mx-auto">
         <div className="flex items-center gap-4 mb-16 px-4">
@@ -128,9 +240,9 @@ export default function HomePage() {
           <div className="h-px bg-white/10 flex-1"></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-t border-l border-white/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-white/10">
           {/* Step 1 */}
-          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-10 h-80 flex flex-col justify-between relative overflow-hidden">
+          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-6 sm:p-10 h-auto sm:h-80 flex flex-col justify-between relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-conclave-pink/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <span className="block text-6xl font-black text-white/5 mb-4 group-hover:text-conclave-pink transition-colors relative z-10">
               01
@@ -150,7 +262,7 @@ export default function HomePage() {
           </div>
 
           {/* Step 2 */}
-          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-10 h-80 flex flex-col justify-between relative overflow-hidden">
+          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-6 sm:p-10 h-auto sm:h-80 flex flex-col justify-between relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-conclave-yellow/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <span className="block text-6xl font-black text-white/5 mb-4 group-hover:text-conclave-yellow transition-colors relative z-10">
               02
@@ -170,7 +282,7 @@ export default function HomePage() {
           </div>
 
           {/* Step 3 */}
-          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-10 h-80 flex flex-col justify-between relative overflow-hidden">
+          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-6 sm:p-10 h-auto sm:h-80 flex flex-col justify-between relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-conclave-green/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <span className="block text-6xl font-black text-white/5 mb-4 group-hover:text-conclave-green transition-colors relative z-10">
               03
@@ -190,7 +302,7 @@ export default function HomePage() {
           </div>
 
           {/* Step 4 */}
-          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-10 h-80 flex flex-col justify-between relative overflow-hidden">
+          <div className="group hover:bg-white/5 transition-all duration-300 border-r border-b border-white/10 p-6 sm:p-10 h-auto sm:h-80 flex flex-col justify-between relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-br from-conclave-blue/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <span className="block text-6xl font-black text-white/5 mb-4 group-hover:text-conclave-blue transition-colors relative z-10">
               04

@@ -386,19 +386,49 @@ export default function ProposalDetailPage() {
       </Link>
 
       <div className="card mb-6">
-        <h1 className="text-2xl font-bold text-white mb-2">{proposal.title}</h1>
-        <p className="text-conclave-muted text-sm mb-4">
-          By {roomPda ? getAnonAlias(proposal.creator, roomPda) : "Unknown"} ·
-          Deadline: {new Date(proposal.deadline * 1000).toLocaleString()}
-          {deadlinePassed ? " (passed)" : ""}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <h1 className="text-xl sm:text-2xl font-bold text-white">{proposal.title}</h1>
+          {proposal.isFinalized ? (
+            <span className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-white/5 text-conclave-muted border border-white/10 font-medium">
+              Finalized
+            </span>
+          ) : deadlinePassed ? (
+            <span className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 font-medium animate-pulse">
+              Reveal Phase
+            </span>
+          ) : (
+            <span className="shrink-0 text-[10px] px-2.5 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/30 font-medium animate-pulse">
+              Voting Open
+            </span>
+          )}
+        </div>
+        <p className="text-conclave-muted text-sm mb-1">
+          By {roomPda ? getAnonAlias(proposal.creator, roomPda) : "Unknown"}
         </p>
-        <p className="text-gray-300 whitespace-pre-wrap">
-          {proposal.description}
-        </p>
+        <div className="flex flex-wrap items-center gap-3 text-xs text-conclave-muted mb-4">
+          <span>Deadline: {new Date(proposal.deadline * 1000).toLocaleString()}</span>
+          {!deadlinePassed && (
+            <span className="text-conclave-accent font-medium">
+              {(() => {
+                const diff = proposal.deadline - now;
+                if (diff < 60) return `${diff}s left`;
+                if (diff < 3600) return `${Math.floor(diff / 60)}m left`;
+                if (diff < 86400) return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m left`;
+                return `${Math.floor(diff / 86400)}d left`;
+              })()}
+            </span>
+          )}
+        </div>
+        {proposal.description && (
+          <p className="text-gray-300 whitespace-pre-wrap text-sm">
+            {proposal.description}
+          </p>
+        )}
       </div>
 
+      {/* Results card with progress bar */}
       <div className="card mb-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-white">Results</h2>
           <button
             onClick={refreshProposal}
@@ -407,87 +437,118 @@ export default function ProposalDetailPage() {
             Refresh
           </button>
         </div>
-        <div className="flex gap-6">
-          <div>
-            <span className="text-conclave-muted text-sm">Yes</span>
-            <p className="text-2xl font-bold text-green-400">
-              {proposal.voteYesCount}
-            </p>
-          </div>
-          <div>
-            <span className="text-conclave-muted text-sm">No</span>
-            <p className="text-2xl font-bold text-red-400">
-              {proposal.voteNoCount}
-            </p>
-          </div>
-        </div>
+        {(() => {
+          const total = proposal.voteYesCount + proposal.voteNoCount;
+          const yesP = total > 0 ? Math.round((proposal.voteYesCount / total) * 100) : 0;
+          const noP = total > 0 ? 100 - yesP : 0;
+          return (
+            <div className="space-y-3">
+              {/* Yes bar */}
+              <div>
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className="text-sm font-medium text-green-400">Yes</span>
+                  <span className="text-xs text-conclave-muted">{proposal.voteYesCount} votes ({yesP}%)</span>
+                </div>
+                <div className="h-3 bg-conclave-dark rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-green-600 to-green-400 rounded-full transition-all duration-500" style={{width: `${yesP}%`}} />
+                </div>
+              </div>
+              {/* No bar */}
+              <div>
+                <div className="flex justify-between items-baseline mb-1">
+                  <span className="text-sm font-medium text-red-400">No</span>
+                  <span className="text-xs text-conclave-muted">{proposal.voteNoCount} votes ({noP}%)</span>
+                </div>
+                <div className="h-3 bg-conclave-dark rounded-full overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-500" style={{width: `${noP}%`}} />
+                </div>
+              </div>
+              <p className="text-[10px] text-conclave-muted pt-1">{total} total votes</p>
+            </div>
+          );
+        })()}
       </div>
 
       {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
-      {!deadlinePassed && (
-        <div className="card">
-          <h2 className="font-semibold text-white mb-3">Vote</h2>
-          {voteStatus === "none" && (
-            <p className="text-conclave-muted text-sm mb-4">
-              Your vote is secret until the deadline. Choose below to commit.
-            </p>
-          )}
-          {voteStatus === "committed" && (
-            <p className="text-conclave-accent text-sm mb-4">
-              Your vote is committed. It will be revealed after the deadline.
-            </p>
-          )}
-          {voteStatus === "revealed" && (
-            <p className="text-conclave-muted text-sm mb-4">
-              Your vote has been revealed and counted.
-            </p>
-          )}
-          {voteStatus === "none" && wallet?.publicKey && (
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleCastVote(1)}
-                disabled={voteLoading}
-                className="btn-primary disabled:opacity-50"
-              >
-                {voteLoading ? "…" : "Vote Yes"}
-              </button>
-              <button
-                onClick={() => handleCastVote(0)}
-                disabled={voteLoading}
-                className="btn-secondary disabled:opacity-50"
-              >
-                {voteLoading ? "…" : "Vote No"}
-              </button>
+      {/* Phase-aware action card */}
+      <div className="card mb-6">
+        {!deadlinePassed ? (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+              <h2 className="font-semibold text-white">Cast Your Vote</h2>
             </div>
-          )}
-        </div>
-      )}
-
-      {deadlinePassed && (
-        <div className="card mb-6">
-          <h2 className="font-semibold text-white mb-3">Reveal your vote</h2>
-          {voteStatus === "committed" && wallet?.publicKey && (
-            <button
-              onClick={handleRevealVote}
-              disabled={revealLoading}
-              className="btn-primary disabled:opacity-50"
-            >
-              {revealLoading ? "Revealing…" : "Reveal my vote"}
-            </button>
-          )}
-          {voteStatus === "revealed" && (
-            <p className="text-conclave-muted text-sm">
-              Your vote has been revealed and counted.
+            {voteStatus === "none" && (
+              <>
+                <p className="text-conclave-muted text-sm mb-4">
+                  Your vote is secret until the deadline. Choose below to commit a hash — no one can see your choice.
+                </p>
+                {wallet?.publicKey && (
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => handleCastVote(1)}
+                      disabled={voteLoading}
+                      className="flex-1 rounded-xl border-2 border-green-500/30 bg-green-500/5 px-6 py-3 font-bold text-green-400 uppercase tracking-wider hover:bg-green-500/15 hover:border-green-500/50 transition-all disabled:opacity-50"
+                    >
+                      {voteLoading ? "..." : "Vote Yes"}
+                    </button>
+                    <button
+                      onClick={() => handleCastVote(0)}
+                      disabled={voteLoading}
+                      className="flex-1 rounded-xl border-2 border-red-500/30 bg-red-500/5 px-6 py-3 font-bold text-red-400 uppercase tracking-wider hover:bg-red-500/15 hover:border-red-500/50 transition-all disabled:opacity-50"
+                    >
+                      {voteLoading ? "..." : "Vote No"}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            {voteStatus === "committed" && (
+              <div className="flex items-center gap-2 rounded-xl border border-conclave-accent/30 bg-conclave-accent/5 px-4 py-3">
+                <div className="w-2 h-2 rounded-full bg-conclave-accent"></div>
+                <p className="text-conclave-accent text-sm">
+                  Vote committed. You'll reveal it after the deadline passes.
+                </p>
+              </div>
+            )}
+            {voteStatus === "revealed" && (
+              <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-3">
+                <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                <p className="text-green-400 text-sm">Vote revealed and counted.</p>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></div>
+              <h2 className="font-semibold text-white">Reveal Phase</h2>
+            </div>
+            <p className="text-conclave-muted text-sm mb-4">
+              Voting ended. Members who voted can now reveal their choices.
             </p>
-          )}
-          {voteStatus === "none" && (
-            <p className="text-conclave-muted text-sm">
-              You did not cast a vote on this proposal.
-            </p>
-          )}
-        </div>
-      )}
+            {voteStatus === "committed" && wallet?.publicKey && (
+              <button
+                onClick={handleRevealVote}
+                disabled={revealLoading}
+                className="rounded-xl border-2 border-yellow-500/30 bg-yellow-500/5 px-6 py-3 font-bold text-yellow-400 uppercase tracking-wider hover:bg-yellow-500/15 hover:border-yellow-500/50 transition-all disabled:opacity-50"
+              >
+                {revealLoading ? "Revealing..." : "Reveal My Vote"}
+              </button>
+            )}
+            {voteStatus === "revealed" && (
+              <div className="flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/5 px-4 py-3">
+                <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                <p className="text-green-400 text-sm">Vote revealed and counted.</p>
+              </div>
+            )}
+            {voteStatus === "none" && (
+              <p className="text-conclave-muted text-sm">You did not vote on this proposal.</p>
+            )}
+          </>
+        )}
+      </div>
 
       {proposal.isFinalized && (
         <div className={`card mb-6 border ${

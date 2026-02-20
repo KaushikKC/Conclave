@@ -124,17 +124,17 @@ body::after {
 
   /* MagnetLover style buttons: Pill shaped, bold, uppercase tracking */
   .btn-primary {
-    @apply relative overflow-hidden rounded-full bg-conclave-text px-8 py-4 font-bold uppercase tracking-widest text-conclave-dark transition-transform hover:scale-105 hover:bg-white;
+    @apply relative overflow-hidden rounded-full bg-conclave-text px-6 py-3 sm:px-8 sm:py-4 font-bold uppercase tracking-widest text-conclave-dark transition-transform hover:scale-105 hover:bg-white text-xs sm:text-sm;
     font-family: 'Outfit', sans-serif;
   }
 
   .btn-secondary {
-    @apply rounded-full border border-conclave-text/30 bg-transparent px-8 py-4 font-bold uppercase tracking-widest text-conclave-text transition-all hover:border-conclave-text hover:bg-conclave-text/10;
+    @apply rounded-full border border-conclave-text/30 bg-transparent px-6 py-3 sm:px-8 sm:py-4 font-bold uppercase tracking-widest text-conclave-text transition-all hover:border-conclave-text hover:bg-conclave-text/10 text-xs sm:text-sm;
     font-family: 'Outfit', sans-serif;
   }
 
   .card {
-    @apply rounded-3xl border border-conclave-border bg-conclave-card/50 p-8 backdrop-blur-md;
+    @apply rounded-2xl sm:rounded-3xl border border-conclave-border bg-conclave-card/50 p-4 sm:p-8 backdrop-blur-md;
   }
 
   /* Text styles */
@@ -148,5 +148,13 @@ body::after {
   .nav-link {
     @apply text-sm font-medium uppercase tracking-widest text-conclave-text/70 transition-colors hover:text-conclave-text;
     font-family: 'Outfit', sans-serif;
+  }
+
+  /* Truncate multiline text */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 }

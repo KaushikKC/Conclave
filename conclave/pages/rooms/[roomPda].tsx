@@ -552,7 +552,7 @@ export default function RoomDetailPage() {
         </div>
       )}
 
-      <div className="flex gap-2 border-b border-conclave-border mb-6">
+      <div className="flex gap-2 border-b border-conclave-border mb-6 overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
         {(["chat", "proposals", "members", ...(room.realmAddress ? ["realms" as const] : [])] as const).map((t) => (
           <button
             key={t}
@@ -609,15 +609,50 @@ export default function RoomDetailPage() {
   );
 }
 
+function getProposalPhase(deadline: number, isFinalized: boolean): {
+  label: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+} {
+  const now = Math.floor(Date.now() / 1000);
+  if (isFinalized) {
+    return { label: "Finalized", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+  }
+  if (now < deadline) {
+    return { label: "Voting", color: "text-green-400", bgColor: "bg-green-500/10", borderColor: "border-green-500/30" };
+  }
+  return { label: "Reveal", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+}
+
+function formatTimeLeft(deadline: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = deadline - now;
+  if (diff <= 0) return "Ended";
+  if (diff < 60) return `${diff}s left`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m left`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m left`;
+  return `${Math.floor(diff / 86400)}d left`;
+}
+
 function ProposalsList({ roomPda }: { roomPda: string }) {
   const [list, setList] = useState<
     {
       publicKey: string;
       title: string;
+      description: string;
       deadline: number;
       isFinalized: boolean;
+      voteYesCount: number;
+      voteNoCount: number;
     }[]
   >([]);
+  const [now, setNow] = useState(Math.floor(Date.now() / 1000));
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -627,8 +662,11 @@ function ProposalsList({ roomPda }: { roomPda: string }) {
           proposals.map((p: ApiProposal) => ({
             publicKey: p.address,
             title: p.title,
+            description: p.description,
             deadline: p.deadline,
             isFinalized: p.is_finalized === 1,
+            voteYesCount: p.vote_yes_count,
+            voteNoCount: p.vote_no_count,
           })),
         );
       } catch {
@@ -642,21 +680,66 @@ function ProposalsList({ roomPda }: { roomPda: string }) {
   }
 
   return (
-    <ul className="space-y-2">
-      {list.map((p) => (
-        <li key={p.publicKey}>
-          <Link
-            href={`/rooms/${roomPda}/proposals/${p.publicKey}`}
-            className="block py-2 border-b border-conclave-border/50 hover:text-conclave-accent"
-          >
-            <span className="font-medium text-white">{p.title}</span>
-            <span className="text-conclave-muted text-sm ml-2">
-              {p.isFinalized ? "Finalized" : "Open"} ·{" "}
-              {new Date(p.deadline * 1000).toLocaleString()}
-            </span>
-          </Link>
-        </li>
-      ))}
+    <ul className="space-y-3">
+      {list.map((p) => {
+        const phase = getProposalPhase(p.deadline, p.isFinalized);
+        const totalVotes = p.voteYesCount + p.voteNoCount;
+        const yesPercent = totalVotes > 0 ? Math.round((p.voteYesCount / totalVotes) * 100) : 0;
+        const deadlinePassed = p.deadline <= now;
+
+        return (
+          <li key={p.publicKey}>
+            <Link
+              href={`/rooms/${roomPda}/proposals/${p.publicKey}`}
+              className="block rounded-xl border border-conclave-border/50 p-4 hover:border-conclave-accent/30 transition-all"
+            >
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <h3 className="font-semibold text-white text-sm">{p.title}</h3>
+                <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${phase.bgColor} ${phase.color} border ${phase.borderColor} font-medium ${phase.label === "Voting" ? "animate-pulse" : ""}`}>
+                  {phase.label}
+                </span>
+              </div>
+
+              {p.description && (
+                <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{p.description}</p>
+              )}
+
+              {/* Vote progress bar */}
+              {totalVotes > 0 && (
+                <div className="mb-2">
+                  <div className="flex justify-between text-[10px] mb-1">
+                    <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
+                    <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
+                  </div>
+                  <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
+                      style={{ width: `${yesPercent}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
+                </div>
+              )}
+
+              {/* Deadline / time left */}
+              <div className="flex items-center justify-between text-[10px] text-conclave-muted">
+                <span>{new Date(p.deadline * 1000).toLocaleString()}</span>
+                {!deadlinePassed && (
+                  <span className="text-conclave-accent font-medium">{formatTimeLeft(p.deadline)}</span>
+                )}
+                {deadlinePassed && !p.isFinalized && (
+                  <span className="text-yellow-400 font-medium">Awaiting reveals</span>
+                )}
+                {p.isFinalized && totalVotes > 0 && (
+                  <span className={`font-bold ${p.voteYesCount > p.voteNoCount ? "text-green-400" : p.voteNoCount > p.voteYesCount ? "text-red-400" : "text-yellow-400"}`}>
+                    {p.voteYesCount > p.voteNoCount ? "PASSED" : p.voteNoCount > p.voteYesCount ? "REJECTED" : "TIED"}
+                  </span>
+                )}
+              </div>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }
