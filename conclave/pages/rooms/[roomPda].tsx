@@ -3,13 +3,15 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAccount,
 } from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getMemberPda } from "../../lib/conclave";
@@ -26,7 +28,13 @@ import {
   pushMemberToIndexer,
   ApiProposal,
 } from "../../lib/api";
-import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
+import {
+  fetchRealmInfo,
+  verifyRealmsMembership,
+  fetchRealmProposals as fetchRealmProposalsFromSdk,
+  ProposalState,
+  RealmProposal,
+} from "../../app/sdk/realms";
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
@@ -588,14 +596,19 @@ export default function RoomDetailPage() {
               Create proposal
             </Link>
           </div>
-          <ProposalsList roomPda={roomPda} />
+          <ProposalsList roomPda={roomPda} realmAddress={room.realmAddress} />
         </div>
       )}
 
       {tab === "members" && (
-        <div className="card">
-          <h2 className="font-semibold text-white mb-4">Members</h2>
-          <MemberList roomPda={roomPubkey} />
+        <div className="space-y-4">
+          <div className="card">
+            <h2 className="font-semibold text-white mb-4">Members</h2>
+            <MemberList roomPda={roomPubkey} />
+          </div>
+          {isAuthority && room && (
+            <InviteSection governanceMint={room.governanceMint} />
+          )}
         </div>
       )}
 
@@ -635,7 +648,39 @@ function formatTimeLeft(deadline: number): string {
   return `${Math.floor(diff / 86400)}d left`;
 }
 
-function ProposalsList({ roomPda }: { roomPda: string }) {
+function getRealmProposalBadge(state: ProposalState): {
+  label: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+} {
+  switch (state) {
+    case ProposalState.Voting:
+      return { label: "Voting", color: "text-green-400", bgColor: "bg-green-500/10", borderColor: "border-green-500/30" };
+    case ProposalState.Succeeded:
+      return { label: "Passed", color: "text-blue-400", bgColor: "bg-blue-500/10", borderColor: "border-blue-500/30" };
+    case ProposalState.Defeated:
+      return { label: "Defeated", color: "text-red-400", bgColor: "bg-red-500/10", borderColor: "border-red-500/30" };
+    case ProposalState.Completed:
+      return { label: "Completed", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+    case ProposalState.Executing:
+    case ProposalState.ExecutingWithErrors:
+      return { label: "Executing", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+    case ProposalState.Cancelled:
+      return { label: "Cancelled", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+    case ProposalState.Vetoed:
+      return { label: "Vetoed", color: "text-red-400", bgColor: "bg-red-500/10", borderColor: "border-red-500/30" };
+    case ProposalState.Draft:
+      return { label: "Draft", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+    case ProposalState.SigningOff:
+      return { label: "Signing Off", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+    default:
+      return { label: "Unknown", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+  }
+}
+
+function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddress?: string | null }) {
+  const { connection } = useConnection();
   const [list, setList] = useState<
     {
       publicKey: string;
@@ -647,6 +692,8 @@ function ProposalsList({ roomPda }: { roomPda: string }) {
       voteNoCount: number;
     }[]
   >([]);
+  const [realmProposals, setRealmProposals] = useState<RealmProposal[]>([]);
+  const [realmProposalsError, setRealmProposalsError] = useState(false);
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
@@ -675,71 +722,283 @@ function ProposalsList({ roomPda }: { roomPda: string }) {
     })();
   }, [roomPda]);
 
-  if (list.length === 0) {
+  // Fetch Realms proposals if room is linked
+  useEffect(() => {
+    if (!realmAddress) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const realmPubkey = new PublicKey(realmAddress);
+        const proposals = await fetchRealmProposalsFromSdk(connection, realmPubkey);
+        if (!cancelled) setRealmProposals(proposals);
+      } catch {
+        if (!cancelled) setRealmProposalsError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [realmAddress, connection]);
+
+  const hasNoProposals = list.length === 0 && realmProposals.length === 0;
+
+  if (hasNoProposals && !realmProposalsError) {
     return <p className="text-conclave-muted text-sm">No proposals yet.</p>;
   }
 
   return (
-    <ul className="space-y-3">
-      {list.map((p) => {
-        const phase = getProposalPhase(p.deadline, p.isFinalized);
-        const totalVotes = p.voteYesCount + p.voteNoCount;
-        const yesPercent = totalVotes > 0 ? Math.round((p.voteYesCount / totalVotes) * 100) : 0;
-        const deadlinePassed = p.deadline <= now;
+    <div className="space-y-4">
+      {/* Realms proposals */}
+      {realmProposals.length > 0 && (
+        <div>
+          <h3 className="text-xs font-medium text-purple-400 uppercase tracking-wider mb-2">Realms DAO Proposals</h3>
+          <ul className="space-y-3">
+            {realmProposals.map((rp) => {
+              const badge = getRealmProposalBadge(rp.state);
+              const yesVotes = parseInt(rp.yesVotes) || 0;
+              const noVotes = parseInt(rp.noVotes) || 0;
+              const totalVotes = yesVotes + noVotes;
+              const yesPercent = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 0;
 
-        return (
-          <li key={p.publicKey}>
-            <Link
-              href={`/rooms/${roomPda}/proposals/${p.publicKey}`}
-              className="block rounded-xl border border-conclave-border/50 p-4 hover:border-conclave-accent/30 transition-all"
-            >
-              <div className="flex items-start justify-between gap-3 mb-2">
-                <h3 className="font-semibold text-white text-sm">{p.title}</h3>
-                <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${phase.bgColor} ${phase.color} border ${phase.borderColor} font-medium ${phase.label === "Voting" ? "animate-pulse" : ""}`}>
-                  {phase.label}
-                </span>
-              </div>
+              return (
+                <li key={rp.pubkey}>
+                  <a
+                    href={`https://app.realms.today/dao/${realmAddress}/proposal/${rp.pubkey}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block rounded-xl border border-purple-500/20 p-4 hover:border-purple-500/40 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
+                          Realms
+                        </span>
+                        <h3 className="font-semibold text-white text-sm">{rp.name}</h3>
+                      </div>
+                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${badge.bgColor} ${badge.color} border ${badge.borderColor} font-medium ${badge.label === "Voting" ? "animate-pulse" : ""}`}>
+                        {badge.label}
+                      </span>
+                    </div>
 
-              {p.description && (
-                <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{p.description}</p>
-              )}
+                    {rp.descriptionLink && (
+                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{rp.descriptionLink}</p>
+                    )}
 
-              {/* Vote progress bar */}
-              {totalVotes > 0 && (
-                <div className="mb-2">
-                  <div className="flex justify-between text-[10px] mb-1">
-                    <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
-                    <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
-                  </div>
-                  <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
-                      style={{ width: `${yesPercent}%` }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
-                </div>
-              )}
+                    {totalVotes > 0 && (
+                      <div className="mb-2">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
+                          <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
+                        </div>
+                        <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
+                            style={{ width: `${yesPercent}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
+                      </div>
+                    )}
 
-              {/* Deadline / time left */}
-              <div className="flex items-center justify-between text-[10px] text-conclave-muted">
-                <span>{new Date(p.deadline * 1000).toLocaleString()}</span>
-                {!deadlinePassed && (
-                  <span className="text-conclave-accent font-medium">{formatTimeLeft(p.deadline)}</span>
-                )}
-                {deadlinePassed && !p.isFinalized && (
-                  <span className="text-yellow-400 font-medium">Awaiting reveals</span>
-                )}
-                {p.isFinalized && totalVotes > 0 && (
-                  <span className={`font-bold ${p.voteYesCount > p.voteNoCount ? "text-green-400" : p.voteNoCount > p.voteYesCount ? "text-red-400" : "text-yellow-400"}`}>
-                    {p.voteYesCount > p.voteNoCount ? "PASSED" : p.voteNoCount > p.voteYesCount ? "REJECTED" : "TIED"}
-                  </span>
-                )}
-              </div>
-            </Link>
-          </li>
+                    <div className="flex items-center justify-between text-[10px] text-conclave-muted">
+                      {rp.votingAt && <span>Started {new Date(rp.votingAt * 1000).toLocaleDateString()}</span>}
+                      {rp.votingCompletedAt && <span>Ended {new Date(rp.votingCompletedAt * 1000).toLocaleDateString()}</span>}
+                      {!rp.votingAt && !rp.votingCompletedAt && <span />}
+                      <span className="text-purple-400">View on Realms &rarr;</span>
+                    </div>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {realmProposalsError && (
+        <p className="text-xs text-conclave-muted italic">Could not load Realms proposals (rate limited or unavailable).</p>
+      )}
+
+      {/* Conclave proposals */}
+      {list.length > 0 && (
+        <div>
+          {realmProposals.length > 0 && (
+            <h3 className="text-xs font-medium text-conclave-accent uppercase tracking-wider mb-2">Conclave Proposals</h3>
+          )}
+          <ul className="space-y-3">
+            {list.map((p) => {
+              const phase = getProposalPhase(p.deadline, p.isFinalized);
+              const totalVotes = p.voteYesCount + p.voteNoCount;
+              const yesPercent = totalVotes > 0 ? Math.round((p.voteYesCount / totalVotes) * 100) : 0;
+              const deadlinePassed = p.deadline <= now;
+
+              return (
+                <li key={p.publicKey}>
+                  <Link
+                    href={`/rooms/${roomPda}/proposals/${p.publicKey}`}
+                    className="block rounded-xl border border-conclave-border/50 p-4 hover:border-conclave-accent/30 transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <h3 className="font-semibold text-white text-sm">{p.title}</h3>
+                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${phase.bgColor} ${phase.color} border ${phase.borderColor} font-medium ${phase.label === "Voting" ? "animate-pulse" : ""}`}>
+                        {phase.label}
+                      </span>
+                    </div>
+
+                    {p.description && (
+                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{p.description}</p>
+                    )}
+
+                    {totalVotes > 0 && (
+                      <div className="mb-2">
+                        <div className="flex justify-between text-[10px] mb-1">
+                          <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
+                          <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
+                        </div>
+                        <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full"
+                            style={{ width: `${yesPercent}%` }}
+                          />
+                        </div>
+                        <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between text-[10px] text-conclave-muted">
+                      <span>{new Date(p.deadline * 1000).toLocaleString()}</span>
+                      {!deadlinePassed && (
+                        <span className="text-conclave-accent font-medium">{formatTimeLeft(p.deadline)}</span>
+                      )}
+                      {deadlinePassed && !p.isFinalized && (
+                        <span className="text-yellow-400 font-medium">Awaiting reveals</span>
+                      )}
+                      {p.isFinalized && totalVotes > 0 && (
+                        <span className={`font-bold ${p.voteYesCount > p.voteNoCount ? "text-green-400" : p.voteNoCount > p.voteYesCount ? "text-red-400" : "text-yellow-400"}`}>
+                          {p.voteYesCount > p.voteNoCount ? "PASSED" : p.voteNoCount > p.voteYesCount ? "REJECTED" : "TIED"}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InviteSection({ governanceMint }: { governanceMint: string }) {
+  const { publicKey: wallet, sendTransaction } = useWallet();
+  const { connection } = useConnection();
+  const [inviteeAddress, setInviteeAddress] = useState("");
+  const [sending, setSending] = useState(false);
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+
+  // Fetch creator's token balance
+  useEffect(() => {
+    if (!wallet) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const mint = new PublicKey(governanceMint);
+        const ata = getAssociatedTokenAddressSync(mint, wallet);
+        const account = await getAccount(connection, ata);
+        if (!cancelled) setTokenBalance(Number(account.amount));
+      } catch {
+        if (!cancelled) setTokenBalance(0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [wallet, governanceMint, connection, sending]);
+
+  const handleSendInvite = async () => {
+    if (!wallet || !inviteeAddress.trim()) return;
+    setSending(true);
+    setStatus(null);
+
+    try {
+      const inviteePubkey = new PublicKey(inviteeAddress.trim());
+      const mint = new PublicKey(governanceMint);
+
+      const creatorAta = getAssociatedTokenAddressSync(mint, wallet);
+      const inviteeAta = getAssociatedTokenAddressSync(mint, inviteePubkey);
+
+      const tx = new Transaction();
+
+      // Create invitee's ATA if it doesn't exist
+      const inviteeAtaInfo = await connection.getAccountInfo(inviteeAta);
+      if (!inviteeAtaInfo) {
+        tx.add(
+          createAssociatedTokenAccountInstruction(
+            wallet,
+            inviteeAta,
+            inviteePubkey,
+            mint,
+          )
         );
-      })}
-    </ul>
+      }
+
+      // Transfer 1 token
+      tx.add(
+        createTransferInstruction(
+          creatorAta,
+          inviteeAta,
+          wallet,
+          1,
+        )
+      );
+
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
+      tx.feePayer = wallet;
+
+      const sig = await sendTransaction(tx, connection);
+      await connection.confirmTransaction(sig, "confirmed");
+
+      setStatus({ type: "success", message: `Sent 1 token to ${inviteePubkey.toBase58().slice(0, 8)}...` });
+      setInviteeAddress("");
+    } catch (err: any) {
+      setStatus({ type: "error", message: err?.message || "Transfer failed" });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <h2 className="font-semibold text-white mb-1">Invite a Member</h2>
+      <p className="text-xs text-conclave-muted mb-4">
+        Send 1 governance token to invite someone to this room.
+        {tokenBalance !== null && (
+          <span className="ml-2 text-conclave-accent font-medium">
+            Balance: {tokenBalance} token{tokenBalance !== 1 ? "s" : ""}
+          </span>
+        )}
+      </p>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={inviteeAddress}
+          onChange={(e) => setInviteeAddress(e.target.value)}
+          placeholder="Wallet address (e.g. 7xK...)"
+          className="flex-1 bg-conclave-dark border border-conclave-border rounded-lg px-3 py-2 text-sm text-white placeholder-conclave-muted focus:outline-none focus:border-conclave-accent"
+        />
+        <button
+          onClick={handleSendInvite}
+          disabled={sending || !inviteeAddress.trim() || tokenBalance === 0}
+          className="btn-primary text-sm whitespace-nowrap disabled:opacity-50"
+        >
+          {sending ? "Sending..." : "Send Invite Token"}
+        </button>
+      </div>
+
+      {status && (
+        <p className={`text-sm mt-2 ${status.type === "success" ? "text-green-400" : "text-red-400"}`}>
+          {status.message}
+        </p>
+      )}
+    </div>
   );
 }

@@ -2,8 +2,10 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import {
   getRealm,
   getTokenOwnerRecordForRealm,
+  getAllProposals,
   ProposalState,
 } from "@realms-today/spl-governance";
+import type { ProgramAccount, Proposal } from "@realms-today/spl-governance";
 
 /**
  * Conclave <-> Realms Integration SDK
@@ -111,6 +113,53 @@ export async function getGovernanceMintForRealm(
     governanceMint: realm.communityMint,
     isVerifiedMember: membership !== null && membership.governingTokenDepositAmount.gtn(0),
   };
+}
+
+export interface RealmProposal {
+  pubkey: string;
+  name: string;
+  descriptionLink: string;
+  state: ProposalState;
+  yesVotes: string;
+  noVotes: string;
+  votingAt: number | null;
+  votingCompletedAt: number | null;
+}
+
+/**
+ * Fetch all proposals from a Realms DAO.
+ * Uses getAllProposals which calls getProgramAccounts — may be rate-limited on devnet.
+ * Returns [] on failure so callers don't break.
+ */
+export async function fetchRealmProposals(
+  connection: Connection,
+  realmAddress: PublicKey
+): Promise<RealmProposal[]> {
+  try {
+    const proposalsByGovernance = await getAllProposals(
+      connection,
+      SPL_GOVERNANCE_PROGRAM_ID,
+      realmAddress
+    );
+    // getAllProposals returns Proposal[][] (grouped by governance), flatten them
+    const allProposals: ProgramAccount<Proposal>[] = proposalsByGovernance.flat();
+
+    return allProposals.map((p) => ({
+      pubkey: p.pubkey.toBase58(),
+      name: p.account.name,
+      descriptionLink: p.account.descriptionLink,
+      state: p.account.state,
+      yesVotes: p.account.yesVotesCount.toString(),
+      noVotes: p.account.noVotesCount.toString(),
+      votingAt: p.account.votingAt ? p.account.votingAt.toNumber() : null,
+      votingCompletedAt: p.account.votingCompletedAt
+        ? p.account.votingCompletedAt.toNumber()
+        : null,
+    }));
+  } catch (err) {
+    console.warn("Failed to fetch Realms proposals:", err);
+    return [];
+  }
 }
 
 // Re-export useful types from the SDK
