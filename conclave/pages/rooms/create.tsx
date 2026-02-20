@@ -134,8 +134,10 @@ export default function CreateRoomPage() {
       // 2b. Notify indexer about the new room immediately and wait for it
       await notifyIndexer([roomPda.toBase58()]);
 
-      // 2c. Link realm address if using Realms mode (indexer has the room now)
+      // 2c. Link realm address if using Realms mode
       if (mintMode === "realms" && realmAddressStr.trim()) {
+        // Small delay to let indexer DB commit the room row
+        await new Promise((r) => setTimeout(r, 1000));
         await postRoomRealm(roomPda.toBase58(), realmAddressStr.trim());
       }
 
@@ -193,6 +195,8 @@ export default function CreateRoomPage() {
           })
           .preInstructions(preInstructions)
           .rpc();
+        // Notify indexer about the new member so "My Rooms" works immediately
+        await notifyIndexer([memberPda.toBase58(), roomPda.toBase58()]);
       } catch {
         // Non-fatal — user can join from room page
       }

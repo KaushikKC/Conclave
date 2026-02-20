@@ -101,6 +101,11 @@ db.exec(`
     created_at INTEGER NOT NULL,
     PRIMARY KEY (proposal, voter)
   );
+
+  CREATE TABLE IF NOT EXISTS realm_links (
+    room TEXT PRIMARY KEY,
+    realm_address TEXT NOT NULL
+  );
 `);
 
 // Migration: add realm_address column to existing DBs
@@ -113,8 +118,16 @@ try {
 // --- Prepared Statements ---
 
 const upsertRoom = db.prepare(`
-  INSERT OR REPLACE INTO rooms (address, authority, governance_mint, name, member_count, proposal_count, created_at, indexed_at)
+  INSERT INTO rooms (address, authority, governance_mint, name, member_count, proposal_count, created_at, indexed_at)
   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(address) DO UPDATE SET
+    authority = excluded.authority,
+    governance_mint = excluded.governance_mint,
+    name = excluded.name,
+    member_count = excluded.member_count,
+    proposal_count = excluded.proposal_count,
+    created_at = excluded.created_at,
+    indexed_at = excluded.indexed_at
 `);
 
 const upsertMember = db.prepare(`
@@ -459,14 +472,7 @@ app.post("/rooms/:address/realm", async (req, res) => {
       roomAddress,
     );
   }
-  // Also store in a pending table as fallback (applied on next re-index)
-  db.prepare(
-    "INSERT OR REPLACE INTO group_keys (room, group_key, created_at) SELECT ?, group_key, created_at FROM group_keys WHERE room = ? LIMIT 0",
-  );
   // Store realm mapping independently so it survives re-indexes
-  db.prepare(
-    "CREATE TABLE IF NOT EXISTS realm_links (room TEXT PRIMARY KEY, realm_address TEXT NOT NULL)",
-  ).run();
   db.prepare(
     "INSERT OR REPLACE INTO realm_links (room, realm_address) VALUES (?, ?)",
   ).run(roomAddress, realmAddress);

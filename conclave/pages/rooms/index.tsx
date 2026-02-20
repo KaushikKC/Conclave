@@ -39,11 +39,15 @@ export default function RoomsListPage() {
   const [myRooms, setMyRooms] = useState<RoomItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState<RoomTab>(connected ? "my" : "all");
+  const [tab, setTab] = useState<RoomTab>("all");
 
-  // Fetch all rooms
+  // Switch to "my" tab when wallet connects
   useEffect(() => {
-    if (!programReadOnly) return;
+    if (connected) setTab("my");
+  }, [connected]);
+
+  // Fetch all rooms from indexer (no dependency on programReadOnly)
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -51,23 +55,26 @@ export default function RoomsListPage() {
         if (cancelled) return;
         setAllRooms(data.map(mapApiRoom));
       } catch {
-        try {
-          const accounts = await (programReadOnly.account as any).daoRoom.all();
-          if (cancelled) return;
-          setAllRooms(
-            accounts.map((acc: any) => ({
-              publicKey: acc.publicKey.toBase58(),
-              name: acc.account.name,
-              authority: acc.account.authority.toBase58(),
-              governanceMint: acc.account.governanceMint.toBase58(),
-              memberCount: acc.account.memberCount ?? 0,
-              proposalCount: acc.account.proposalCount ?? 0,
-              createdAt: Number(acc.account.createdAt ?? 0),
-              realmAddress: null,
-            })),
-          );
-        } catch (e: any) {
-          if (!cancelled) setError(e?.message || "Failed to load rooms");
+        // Fallback to on-chain if indexer is down and program is ready
+        if (programReadOnly) {
+          try {
+            const accounts = await (programReadOnly.account as any).daoRoom.all();
+            if (cancelled) return;
+            setAllRooms(
+              accounts.map((acc: any) => ({
+                publicKey: acc.publicKey.toBase58(),
+                name: acc.account.name,
+                authority: acc.account.authority.toBase58(),
+                governanceMint: acc.account.governanceMint.toBase58(),
+                memberCount: acc.account.memberCount ?? 0,
+                proposalCount: acc.account.proposalCount ?? 0,
+                createdAt: Number(acc.account.createdAt ?? 0),
+                realmAddress: null,
+              })),
+            );
+          } catch (e: any) {
+            if (!cancelled) setError(e?.message || "Failed to load rooms");
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);
