@@ -22,9 +22,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <div className="border-r border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors group cursor-pointer bg-conclave-dark relative z-20">
             <Link
               href="/"
-              className="text-3xl grayscale group-hover:grayscale-0 transition-all transform group-hover:scale-110"
+              className="flex items-center justify-center h-full px-2"
             >
-              ❤️
+              <img
+                src="/conclave-logo.svg"
+                alt="Conclave"
+                className="h-10 w-10 md:h-12 md:w-12 grayscale group-hover:grayscale-0 transition-all transform group-hover:scale-110 object-contain"
+              />
             </Link>
           </div>
 
