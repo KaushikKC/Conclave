@@ -217,13 +217,16 @@ export async function postRoomRealm(
   realmAddress: string,
 ): Promise<void> {
   try {
-    await fetch(`${BASE_URL}/rooms/${roomAddress}/realm`, {
+    const res = await fetch(`${BASE_URL}/rooms/${roomAddress}/realm`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ realmAddress }),
     });
-  } catch {
-    // Non-fatal
+    if (!res.ok) {
+      console.warn(`postRoomRealm failed: ${res.status} ${res.statusText}`);
+    }
+  } catch (err) {
+    console.warn("postRoomRealm error:", err);
   }
 }
 

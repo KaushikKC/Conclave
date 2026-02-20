@@ -18,6 +18,10 @@ interface RoomItem {
 }
 
 function mapApiRoom(r: ApiRoom): RoomItem {
+  // Check localStorage for realm address as fallback
+  const localRealm = typeof window !== "undefined"
+    ? localStorage.getItem(`conclave_realm_${r.address}`)
+    : null;
   return {
     publicKey: r.address,
     name: r.name,
@@ -26,7 +30,7 @@ function mapApiRoom(r: ApiRoom): RoomItem {
     memberCount: r.member_count,
     proposalCount: r.proposal_count,
     createdAt: r.created_at,
-    realmAddress: r.realm_address || null,
+    realmAddress: r.realm_address || localRealm || null,
   };
 }
 
@@ -85,7 +89,7 @@ export default function RoomsListPage() {
     };
   }, [programReadOnly]);
 
-  // Fetch my rooms
+  // Fetch my rooms: try indexer API, fallback to filtering allRooms by authority
   useEffect(() => {
     if (!wallet) {
       setMyRooms([]);
@@ -95,16 +99,26 @@ export default function RoomsListPage() {
     (async () => {
       try {
         const data = await fetchMyRooms(wallet.toBase58());
-        if (!cancelled) setMyRooms(data.map(mapApiRoom));
+        if (!cancelled && data.length > 0) {
+          setMyRooms(data.map(mapApiRoom));
+          return;
+        }
       } catch {
-        // Non-fatal — just show empty
-        if (!cancelled) setMyRooms([]);
+        // Indexer API failed — fall through to fallback
+      }
+      // Fallback: show rooms where current wallet is the creator
+      if (!cancelled && allRooms.length > 0) {
+        const walletStr = wallet.toBase58();
+        const created = allRooms.filter((r) => r.authority === walletStr);
+        setMyRooms(created);
+      } else if (!cancelled) {
+        setMyRooms([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [wallet]);
+  }, [wallet, allRooms]);
 
   const displayRooms = tab === "my" ? myRooms : allRooms;
 

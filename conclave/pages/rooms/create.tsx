@@ -136,9 +136,12 @@ export default function CreateRoomPage() {
 
       // 2c. Link realm address if using Realms mode
       if (mintMode === "realms" && realmAddressStr.trim()) {
+        const realmAddr = realmAddressStr.trim();
+        // Store in localStorage so room detail page can always find it
+        localStorage.setItem(`conclave_realm_${roomPda.toBase58()}`, realmAddr);
         // Small delay to let indexer DB commit the room row
         await new Promise((r) => setTimeout(r, 1000));
-        await postRoomRealm(roomPda.toBase58(), realmAddressStr.trim());
+        await postRoomRealm(roomPda.toBase58(), realmAddr);
       }
 
       // 3. Generate group key

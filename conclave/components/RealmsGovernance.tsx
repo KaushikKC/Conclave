@@ -3,45 +3,7 @@
 import { useEffect, useState } from "react";
 import { PublicKey } from "@solana/web3.js";
 import { useConnection } from "@solana/wallet-adapter-react";
-import {
-  fetchRealmsProposals,
-  fetchRealmsGovernances,
-  fetchRealmInfo,
-  ProposalState,
-  type RealmsProposalInfo,
-  type RealmsGovernanceInfo,
-  type RealmInfo,
-} from "../app/sdk/realms";
-
-function proposalStateLabel(state: ProposalState): {
-  label: string;
-  color: string;
-} {
-  switch (state) {
-    case ProposalState.Draft:
-      return { label: "Draft", color: "text-gray-400" };
-    case ProposalState.SigningOff:
-      return { label: "Signing Off", color: "text-yellow-400" };
-    case ProposalState.Voting:
-      return { label: "Voting", color: "text-green-400" };
-    case ProposalState.Succeeded:
-      return { label: "Succeeded", color: "text-blue-400" };
-    case ProposalState.Executing:
-      return { label: "Executing", color: "text-purple-400" };
-    case ProposalState.Completed:
-      return { label: "Completed", color: "text-conclave-muted" };
-    case ProposalState.Cancelled:
-      return { label: "Cancelled", color: "text-red-400" };
-    case ProposalState.Defeated:
-      return { label: "Defeated", color: "text-red-400" };
-    case ProposalState.ExecutingWithErrors:
-      return { label: "Exec Error", color: "text-red-400" };
-    case ProposalState.Vetoed:
-      return { label: "Vetoed", color: "text-red-400" };
-    default:
-      return { label: "Unknown", color: "text-gray-400" };
-  }
-}
+import { fetchRealmInfo, type RealmInfo } from "../app/sdk/realms";
 
 interface Props {
   realmAddress: string;
@@ -50,8 +12,6 @@ interface Props {
 export default function RealmsGovernance({ realmAddress }: Props) {
   const { connection } = useConnection();
   const [realmInfo, setRealmInfo] = useState<RealmInfo | null>(null);
-  const [proposals, setProposals] = useState<RealmsProposalInfo[]>([]);
-  const [governances, setGovernances] = useState<RealmsGovernanceInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -60,17 +20,11 @@ export default function RealmsGovernance({ realmAddress }: Props) {
     (async () => {
       try {
         const realmPubkey = new PublicKey(realmAddress);
-        const [info, govs, props] = await Promise.all([
-          fetchRealmInfo(connection, realmPubkey),
-          fetchRealmsGovernances(connection, realmPubkey),
-          fetchRealmsProposals(connection, realmPubkey),
-        ]);
+        const info = await fetchRealmInfo(connection, realmPubkey);
         if (cancelled) return;
         setRealmInfo(info);
-        setGovernances(govs);
-        setProposals(props);
       } catch (err: any) {
-        if (!cancelled) setError(err?.message || "Failed to load Realms data");
+        if (!cancelled) setError(err?.message || "Failed to load Realm info");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -83,177 +37,140 @@ export default function RealmsGovernance({ realmAddress }: Props) {
   if (loading) {
     return (
       <p className="text-conclave-muted text-sm py-4">
-        Loading Realms governance data...
+        Loading Realms data...
       </p>
     );
   }
 
-  if (error) {
-    return <p className="text-red-400 text-sm py-4">{error}</p>;
-  }
-
-  const activeProposals = proposals.filter(
-    (p) => p.state === ProposalState.Voting
-  );
-  const otherProposals = proposals.filter(
-    (p) => p.state !== ProposalState.Voting
-  );
-
-  return (
-    <div className="space-y-6">
-      {/* Realm overview */}
-      {realmInfo && (
+  if (error || !realmInfo) {
+    return (
+      <div className="space-y-4 py-2">
         <div className="rounded-lg border border-conclave-border bg-conclave-dark/50 p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
                 Realms DAO
               </span>
-              <span className="text-white font-semibold">
-                {realmInfo.name}
+              <span className="text-white font-medium text-sm font-mono truncate max-w-xs">
+                {realmAddress}
               </span>
             </div>
-            <a
-              href={`https://app.realms.today/dao/${realmAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-conclave-accent hover:underline"
-            >
-              Open in Realms &rarr;
-            </a>
           </div>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-lg font-bold text-white">
-                {governances.length}
-              </p>
-              <p className="text-xs text-conclave-muted">Governances</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-white">
-                {proposals.length}
-              </p>
-              <p className="text-xs text-conclave-muted">Proposals</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-white">
-                {activeProposals.length}
-              </p>
-              <p className="text-xs text-conclave-muted">Active Votes</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Active proposals */}
-      {activeProposals.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-green-400 uppercase tracking-wider mb-3">
-            Active Votes
-          </h3>
-          <ul className="space-y-2">
-            {activeProposals.map((p) => (
-              <ProposalCard
-                key={p.pubkey.toBase58()}
-                proposal={p}
-                realmAddress={realmAddress}
-              />
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Past proposals */}
-      {otherProposals.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-conclave-muted uppercase tracking-wider mb-3">
-            Past Proposals ({otherProposals.length})
-          </h3>
-          <ul className="space-y-2">
-            {otherProposals.slice(0, 10).map((p) => (
-              <ProposalCard
-                key={p.pubkey.toBase58()}
-                proposal={p}
-                realmAddress={realmAddress}
-              />
-            ))}
-            {otherProposals.length > 10 && (
-              <li className="text-center py-2">
-                <a
-                  href={`https://app.realms.today/dao/${realmAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-conclave-accent hover:underline"
-                >
-                  View all {otherProposals.length} proposals on Realms &rarr;
-                </a>
-              </li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {proposals.length === 0 && (
-        <p className="text-conclave-muted text-sm">
-          No proposals found in this Realm.
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ProposalCard({
-  proposal,
-  realmAddress,
-}: {
-  proposal: RealmsProposalInfo;
-  realmAddress: string;
-}) {
-  const { label, color } = proposalStateLabel(proposal.state);
-  const totalVotes = proposal.yesVotes + proposal.noVotes;
-  const yesPercent =
-    totalVotes > 0 ? Math.round((proposal.yesVotes / totalVotes) * 100) : 0;
-
-  return (
-    <li className="rounded-lg border border-conclave-border/50 p-3 hover:border-conclave-border transition">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
+          {error && <p className="text-yellow-400 text-xs mb-3">{error}</p>}
+          <p className="text-conclave-muted text-sm mb-3">
+            Could not fetch live data from the Realm. This can happen due to RPC rate limits.
+          </p>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}/proposal/${proposal.pubkey.toBase58()}`}
+            href={`https://app.realms.today/dao/${realmAddress}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium text-white hover:text-conclave-accent transition truncate block"
+            className="inline-block text-sm px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
           >
-            {proposal.name}
+            View on Realms &rarr;
           </a>
-          {proposal.votingAt && (
-            <p className="text-xs text-conclave-muted mt-1">
-              Voting started{" "}
-              {new Date(proposal.votingAt * 1000).toLocaleDateString()}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Realm overview */}
+      <div className="rounded-lg border border-conclave-border bg-conclave-dark/50 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
+              Realms DAO
+            </span>
+            <span className="text-white font-semibold">
+              {realmInfo.name}
+            </span>
+          </div>
+          <a
+            href={`https://app.realms.today/dao/${realmAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-conclave-accent hover:underline"
+          >
+            Open in Realms &rarr;
+          </a>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-center mb-4">
+          <div>
+            <p className="text-lg font-bold text-white">
+              {realmInfo.votingProposalCount}
             </p>
+            <p className="text-xs text-conclave-muted">Active Votes</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold text-white">
+              {realmInfo.councilMint ? "Yes" : "No"}
+            </p>
+            <p className="text-xs text-conclave-muted">Council</p>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-xs">
+          <div className="flex justify-between">
+            <span className="text-conclave-muted">Community Mint</span>
+            <span className="text-white font-mono truncate max-w-[200px]">
+              {realmInfo.communityMint.toBase58()}
+            </span>
+          </div>
+          {realmInfo.councilMint && (
+            <div className="flex justify-between">
+              <span className="text-conclave-muted">Council Mint</span>
+              <span className="text-white font-mono truncate max-w-[200px]">
+                {realmInfo.councilMint.toBase58()}
+              </span>
+            </div>
+          )}
+          {realmInfo.authority && (
+            <div className="flex justify-between">
+              <span className="text-conclave-muted">Authority</span>
+              <span className="text-white font-mono truncate max-w-[200px]">
+                {realmInfo.authority.toBase58()}
+              </span>
+            </div>
           )}
         </div>
-        <span className={`text-xs font-medium ${color} whitespace-nowrap`}>
-          {label}
-        </span>
       </div>
-      {totalVotes > 0 && (
-        <div className="mt-2">
-          <div className="flex items-center gap-2 text-xs text-conclave-muted">
-            <span className="text-green-400">Yes {yesPercent}%</span>
-            <span>&middot;</span>
-            <span className="text-red-400">No {100 - yesPercent}%</span>
-            <span>&middot;</span>
-            <span>{totalVotes.toLocaleString()} votes</span>
-          </div>
-          <div className="mt-1 h-1.5 bg-conclave-dark rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full"
-              style={{ width: `${yesPercent}%` }}
-            />
-          </div>
+
+      {/* Quick actions */}
+      <div className="rounded-lg border border-conclave-border bg-conclave-dark/50 p-4">
+        <h3 className="text-sm font-semibold text-white mb-3">Governance</h3>
+        <p className="text-conclave-muted text-sm mb-4">
+          Use Conclave to discuss and vote on governance proposals anonymously.
+          View the full DAO dashboard on Realms.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`https://app.realms.today/dao/${realmAddress}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
+          >
+            DAO Dashboard
+          </a>
+          <a
+            href={`https://app.realms.today/dao/${realmAddress}/members`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm px-4 py-2 rounded-lg border border-conclave-border text-conclave-muted hover:text-white transition"
+          >
+            Members
+          </a>
+          <a
+            href={`https://app.realms.today/dao/${realmAddress}/treasury`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm px-4 py-2 rounded-lg border border-conclave-border text-conclave-muted hover:text-white transition"
+          >
+            Treasury
+          </a>
         </div>
-      )}
-    </li>
+      </div>
+    </div>
   );
 }

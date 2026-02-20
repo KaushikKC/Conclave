@@ -68,17 +68,27 @@ export default function RoomDetailPage() {
   useEffect(() => {
     if (!roomPda) return;
     let cancelled = false;
+    // Always check localStorage for realm address (most reliable source)
+    const localRealm = typeof window !== "undefined"
+      ? localStorage.getItem(`conclave_realm_${roomPda}`)
+      : null;
+
     (async () => {
       try {
         const data = await fetchRoom(roomPda);
         if (cancelled) return;
+        const realmAddr = data.realm_address || localRealm || null;
+        // Cache realm address in localStorage for all users
+        if (realmAddr && typeof window !== "undefined") {
+          localStorage.setItem(`conclave_realm_${roomPda}`, realmAddr);
+        }
         setRoom({
           name: data.name,
           authority: data.authority,
           governanceMint: data.governance_mint,
           memberCount: data.member_count,
           proposalCount: data.proposal_count,
-          realmAddress: data.realm_address || null,
+          realmAddress: realmAddr,
         });
       } catch {
         if (cancelled) {
@@ -98,7 +108,7 @@ export default function RoomDetailPage() {
               governanceMint: acc.governanceMint.toBase58(),
               memberCount: acc.memberCount,
               proposalCount: acc.proposalCount,
-              realmAddress: null,
+              realmAddress: localRealm || null,
             });
           } catch {
             if (!cancelled) setRoom(null);
