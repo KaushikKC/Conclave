@@ -410,14 +410,14 @@ function subscribeToLogs() {
   );
 }
 
-// Periodic re-index to catch any missed updates
+// Periodic re-index — very infrequent because public devnet RPC rate-limits getProgramAccounts
 setInterval(async () => {
   try {
     await indexAllAccounts();
   } catch (err) {
     console.error("Re-index error:", err);
   }
-}, 10_000); // Every 10 seconds (fallback if log subscription misses events)
+}, 300_000); // Every 5 minutes (public devnet RPC rate-limits getProgramAccounts heavily)
 
 // --- REST API ---
 
@@ -439,6 +439,42 @@ app.get("/rooms", (_req, res) => {
     .prepare("SELECT * FROM rooms ORDER BY created_at DESC")
     .all();
   res.json(rooms);
+});
+
+// POST /rooms — frontend pushes room data directly (avoids RPC rate limits)
+app.post("/rooms", (req, res) => {
+  const { address, authority, governance_mint, name, member_count, proposal_count, created_at } = req.body;
+  if (!address || !authority || !governance_mint || !name) {
+    return res.status(400).json({ error: "address, authority, governance_mint, name required" });
+  }
+  const now = Math.floor(Date.now() / 1000);
+  upsertRoom.run(
+    address,
+    authority,
+    governance_mint,
+    name,
+    member_count ?? 0,
+    proposal_count ?? 0,
+    created_at ?? now,
+    now,
+  );
+  console.log(`Direct-indexed room ${name} (${address})`);
+  res.json({ ok: true });
+});
+
+// POST /members — frontend pushes member data directly
+app.post("/members", (req, res) => {
+  const { address, wallet, room, joined_at } = req.body;
+  if (!address || !wallet || !room) {
+    return res.status(400).json({ error: "address, wallet, room required" });
+  }
+  const now = Math.floor(Date.now() / 1000);
+  upsertMember.run(address, wallet, room, joined_at ?? now, now);
+  // Also bump room member count
+  db.prepare("UPDATE rooms SET member_count = (SELECT COUNT(*) FROM members WHERE room = ?) WHERE address = ?")
+    .run(room, room);
+  console.log(`Direct-indexed member ${wallet} in room ${room}`);
+  res.json({ ok: true });
 });
 
 // GET /rooms/:address

@@ -23,7 +23,7 @@ import {
   fetchGroupKey as fetchGroupKeyFromApi,
   postGroupKey,
   postGroupKeyWithRetry,
-  notifyIndexer,
+  pushMemberToIndexer,
   ApiProposal,
 } from "../../lib/api";
 import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
@@ -333,8 +333,13 @@ export default function RoomDetailPage() {
       );
       setGroupKey(keyBytes);
       setIsMember(true);
-      // Notify indexer about the new member + updated room
-      notifyIndexer([memberPda.toBase58(), roomPda]);
+      // Push member data directly to indexer (no RPC needed)
+      pushMemberToIndexer(
+        memberPda.toBase58(),
+        wallet.toBase58(),
+        roomPda,
+        Math.floor(Date.now() / 1000),
+      );
     } catch (err: any) {
       setJoinError(err?.message || "Join failed");
     } finally {

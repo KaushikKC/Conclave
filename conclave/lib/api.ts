@@ -211,6 +211,43 @@ export async function notifyIndexer(accounts: string[]): Promise<void> {
   }
 }
 
+/** Push room data directly to indexer (bypasses RPC, avoids rate limits) */
+export async function pushRoomToIndexer(
+  address: string,
+  authority: string,
+  governance_mint: string,
+  name: string,
+  created_at: number,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/rooms`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, authority, governance_mint, name, member_count: 0, proposal_count: 0, created_at }),
+    });
+  } catch (err) {
+    console.warn("pushRoomToIndexer error:", err);
+  }
+}
+
+/** Push member data directly to indexer (bypasses RPC, avoids rate limits) */
+export async function pushMemberToIndexer(
+  address: string,
+  wallet: string,
+  room: string,
+  joined_at: number,
+): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/members`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, wallet, room, joined_at }),
+    });
+  } catch (err) {
+    console.warn("pushMemberToIndexer error:", err);
+  }
+}
+
 /** Link a room to a Realms DAO address in the indexer */
 export async function postRoomRealm(
   roomAddress: string,

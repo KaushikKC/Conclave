@@ -13,7 +13,7 @@ import {
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getRoomPda, getMemberPda } from "../../lib/conclave";
 import { generateGroupKey } from "../../app/sdk/crypto";
-import { postGroupKeyWithRetry, notifyIndexer, postRoomRealm } from "../../lib/api";
+import { postGroupKeyWithRetry, postRoomRealm, pushRoomToIndexer, pushMemberToIndexer } from "../../lib/api";
 import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
 
 const MAX_NAME_LEN = 50;
@@ -131,8 +131,15 @@ export default function CreateRoomPage() {
       setStatus("Confirming transaction...");
       await connection.confirmTransaction(sig, "confirmed");
 
-      // 2b. Notify indexer about the new room immediately and wait for it
-      await notifyIndexer([roomPda.toBase58()]);
+      // 2b. Push room data directly to indexer (no RPC needed — avoids rate limits)
+      const timestamp = Math.floor(Date.now() / 1000);
+      await pushRoomToIndexer(
+        roomPda.toBase58(),
+        wallet.toBase58(),
+        governanceMint.toBase58(),
+        trimmed,
+        timestamp,
+      );
 
       // 2c. Link realm address if using Realms mode
       if (mintMode === "realms" && realmAddressStr.trim()) {
@@ -198,8 +205,13 @@ export default function CreateRoomPage() {
           })
           .preInstructions(preInstructions)
           .rpc();
-        // Notify indexer about the new member so "My Rooms" works immediately
-        await notifyIndexer([memberPda.toBase58(), roomPda.toBase58()]);
+        // Push member data directly to indexer (no RPC needed)
+        await pushMemberToIndexer(
+          memberPda.toBase58(),
+          wallet.toBase58(),
+          roomPda.toBase58(),
+          Math.floor(Date.now() / 1000),
+        );
       } catch {
         // Non-fatal — user can join from room page
       }
