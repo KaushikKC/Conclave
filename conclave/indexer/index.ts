@@ -312,6 +312,18 @@ async function indexAllAccounts() {
   for (const row of messagesOk) upsertMessage.run(...row);
   for (const row of voteCommitmentsOk) upsertVoteCommitment.run(...row);
 
+  // Re-apply realm links (survive re-indexes that overwrite rooms via INSERT OR REPLACE)
+  try {
+    const links = db.prepare("SELECT room, realm_address FROM realm_links").all() as { room: string; realm_address: string }[];
+    for (const link of links) {
+      db.prepare("UPDATE rooms SET realm_address = ? WHERE address = ? AND (realm_address IS NULL OR realm_address != ?)").run(
+        link.realm_address, link.room, link.realm_address
+      );
+    }
+  } catch {
+    // realm_links table may not exist yet
+  }
+
   console.log("Indexing complete");
 }
 
@@ -426,17 +438,40 @@ app.get("/rooms/:address", (req, res) => {
 });
 
 // POST /rooms/:address/realm — link a room to a Realms DAO
-app.post("/rooms/:address/realm", (req, res) => {
+app.post("/rooms/:address/realm", async (req, res) => {
   const { realmAddress } = req.body;
   if (!realmAddress || typeof realmAddress !== "string") {
     return res.status(400).json({ error: "realmAddress (string) required" });
   }
   const roomAddress = req.params.address;
-  db.prepare("UPDATE rooms SET realm_address = ? WHERE address = ?").run(
+
+  // Try to update immediately, then retry with ensureRoomInDb if room not in DB yet
+  let result = db.prepare("UPDATE rooms SET realm_address = ? WHERE address = ?").run(
     realmAddress,
     roomAddress,
   );
-  console.log(`Linked room ${roomAddress} to realm ${realmAddress}`);
+  if (result.changes === 0) {
+    // Room not indexed yet — wait a moment then try to fetch from chain
+    await new Promise((r) => setTimeout(r, 2000));
+    await ensureRoomInDb(roomAddress);
+    result = db.prepare("UPDATE rooms SET realm_address = ? WHERE address = ?").run(
+      realmAddress,
+      roomAddress,
+    );
+  }
+  // Also store in a pending table as fallback (applied on next re-index)
+  db.prepare(
+    "INSERT OR REPLACE INTO group_keys (room, group_key, created_at) SELECT ?, group_key, created_at FROM group_keys WHERE room = ? LIMIT 0",
+  );
+  // Store realm mapping independently so it survives re-indexes
+  db.prepare(
+    "CREATE TABLE IF NOT EXISTS realm_links (room TEXT PRIMARY KEY, realm_address TEXT NOT NULL)",
+  ).run();
+  db.prepare(
+    "INSERT OR REPLACE INTO realm_links (room, realm_address) VALUES (?, ?)",
+  ).run(roomAddress, realmAddress);
+
+  console.log(`Linked room ${roomAddress} to realm ${realmAddress} (changes: ${result.changes})`);
   res.json({ ok: true });
 });
 

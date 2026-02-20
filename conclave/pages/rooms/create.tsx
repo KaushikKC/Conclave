@@ -131,12 +131,12 @@ export default function CreateRoomPage() {
       setStatus("Confirming transaction...");
       await connection.confirmTransaction(sig, "confirmed");
 
-      // 2b. Notify indexer about the new room immediately
-      notifyIndexer([roomPda.toBase58()]);
+      // 2b. Notify indexer about the new room immediately and wait for it
+      await notifyIndexer([roomPda.toBase58()]);
 
-      // 2c. Link realm address if using Realms mode
+      // 2c. Link realm address if using Realms mode (indexer has the room now)
       if (mintMode === "realms" && realmAddressStr.trim()) {
-        postRoomRealm(roomPda.toBase58(), realmAddressStr.trim());
+        await postRoomRealm(roomPda.toBase58(), realmAddressStr.trim());
       }
 
       // 3. Generate group key

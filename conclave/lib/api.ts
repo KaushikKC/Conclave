@@ -61,6 +61,11 @@ export interface ApiVoteCommitment {
   indexed_at: number;
 }
 
+/** Fetch rooms where the given wallet is a member */
+export function fetchMyRooms(walletAddress: string): Promise<ApiRoom[]> {
+  return fetchJSON(`/members/${walletAddress}/rooms`);
+}
+
 // --- Fetch functions ---
 
 export function fetchRooms(): Promise<ApiRoom[]> {

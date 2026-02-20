@@ -11,7 +11,7 @@ import { getAnonAlias } from "../lib/anon";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
 const POLL_INTERVAL_MS = 5000;
-const EPHEMERAL_CHECK_MS = 3000;
+const EPHEMERAL_CHECK_MS = 10000;
 
 const EPHEMERAL_DURATIONS = [
   { label: "30s", seconds: 30 },
@@ -138,38 +138,26 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     return () => clearInterval(interval);
   }, [loadMessages]);
 
-  // Auto-delete expired ephemeral messages
+  // Auto-hide expired ephemeral messages (frontend-only, no on-chain tx)
   useEffect(() => {
-    if (!program || !wallet?.publicKey) return;
-    const interval = setInterval(async () => {
+    const interval = setInterval(() => {
       const currentTime = Math.floor(Date.now() / 1000);
-      const toDelete: string[] = [];
+      const expired: string[] = [];
       for (const [pda, expiresAt] of ephemeralMapRef.current.entries()) {
         if (currentTime >= expiresAt) {
-          toDelete.push(pda);
+          expired.push(pda);
         }
       }
-      for (const pda of toDelete) {
-        try {
-          await program.methods
-            .closeMessage()
-            .accountsPartial({
-              sender: wallet.publicKey!,
-              message: new PublicKey(pda),
-            })
-            .rpc();
+      if (expired.length > 0) {
+        for (const pda of expired) {
+          ephemeralMapRef.current.delete(pda);
           deleteMessageFromIndexer(pda);
-          ephemeralMapRef.current.delete(pda);
-          setMessages((prev) => prev.filter((m) => m.publicKey !== pda));
-        } catch (err) {
-          console.warn("Failed to close ephemeral message:", pda, err);
-          // Remove from tracking to avoid infinite retries
-          ephemeralMapRef.current.delete(pda);
         }
+        setMessages((prev) => prev.filter((m) => !expired.includes(m.publicKey)));
       }
     }, EPHEMERAL_CHECK_MS);
     return () => clearInterval(interval);
-  }, [program, wallet?.publicKey]);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
