@@ -1,6 +1,30 @@
 use anchor_lang::prelude::*;
 
 #[event]
+pub struct SessionCreated {
+    pub room: Pubkey,
+    pub owner: Pubkey,
+    pub session_key: Pubkey,
+    pub expires_at: i64,
+    pub timestamp: i64,
+}
+
+#[event]
+pub struct TreasuryFunded {
+    pub room: Pubkey,
+    pub funder: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct ProposalActionExecuted {
+    pub room: Pubkey,
+    pub proposal: Pubkey,
+    pub recipient: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
 pub struct RoomCreated {
     pub room: Pubkey,
     pub authority: Pubkey,

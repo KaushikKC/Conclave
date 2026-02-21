@@ -16,6 +16,11 @@ pub use instructions::finalize_proposal::*;
 pub use instructions::close_message::*;
 pub use instructions::close_vote::*;
 pub use instructions::update_member_key::*;
+pub use instructions::create_session::*;
+pub use instructions::send_message_with_session::*;
+pub use instructions::init_treasury::*;
+pub use instructions::fund_treasury::*;
+pub use instructions::execute_proposal_action::*;
 
 declare_id!("E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU");
 
@@ -88,5 +93,40 @@ pub mod conclave {
         new_encrypted_group_key: Vec<u8>,
     ) -> Result<()> {
         instructions::update_member_key::handler(ctx, new_encrypted_group_key)
+    }
+
+    // ── Session Keys (gasless chat) ────────────────────────────────────────────
+
+    pub fn create_session(
+        ctx: Context<CreateSession>,
+        session_key: Pubkey,
+        expires_at: i64,
+    ) -> Result<()> {
+        instructions::create_session::handler(ctx, session_key, expires_at)
+    }
+
+    pub fn send_message_with_session(
+        ctx: Context<SendMessageWithSession>,
+        ciphertext: Vec<u8>,
+        timestamp: i64,
+    ) -> Result<()> {
+        instructions::send_message_with_session::handler(ctx, ciphertext, timestamp)
+    }
+
+    // ── Treasury ───────────────────────────────────────────────────────────────
+
+    pub fn init_treasury(ctx: Context<InitTreasury>) -> Result<()> {
+        instructions::init_treasury::handler(ctx)
+    }
+
+    pub fn fund_treasury(ctx: Context<FundTreasury>, amount: u64) -> Result<()> {
+        instructions::fund_treasury::handler(ctx, amount)
+    }
+
+    pub fn execute_proposal_action(
+        ctx: Context<ExecuteProposalAction>,
+        amount: u64,
+    ) -> Result<()> {
+        instructions::execute_proposal_action::handler(ctx, amount)
     }
 }

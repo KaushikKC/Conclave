@@ -46,4 +46,16 @@ pub enum ConclaveError {
     InsufficientCredits,
     #[msg("Invalid vote mode, must be 0 (standard) or 1 (quadratic)")]
     InvalidVoteMode,
+    #[msg("Session expiry must be in the future")]
+    SessionExpiryInPast,
+    #[msg("Session key does not match the session account")]
+    SessionKeyMismatch,
+    #[msg("Session has expired")]
+    SessionExpired,
+    #[msg("Proposal did not pass (yes votes must exceed no votes)")]
+    ProposalNotPassed,
+    #[msg("Treasury has insufficient funds for this transfer")]
+    InsufficientTreasury,
+    #[msg("Amount must be greater than zero")]
+    InvalidAmount,
 }
