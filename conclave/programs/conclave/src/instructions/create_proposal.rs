@@ -35,6 +35,8 @@ pub fn handler(
     title: String,
     description: String,
     deadline: i64,
+    vote_mode: u8,
+    total_credits: u32,
 ) -> Result<()> {
     require!(
         title.len() <= Proposal::MAX_TITLE_LEN,
@@ -44,6 +46,14 @@ pub fn handler(
         description.len() <= Proposal::MAX_DESC_LEN,
         ConclaveError::DescriptionTooLong
     );
+    require!(
+        vote_mode == 0 || vote_mode == 1,
+        ConclaveError::InvalidVoteMode
+    );
+    // Quadratic mode requires at least 1 credit
+    if vote_mode == 1 {
+        require!(total_credits >= 1, ConclaveError::InsufficientCredits);
+    }
 
     let clock = Clock::get()?;
     require!(deadline > clock.unix_timestamp, ConclaveError::DeadlineInPast);
@@ -58,6 +68,8 @@ pub fn handler(
     proposal.deadline = deadline;
     proposal.is_finalized = false;
     proposal.bump = ctx.bumps.proposal;
+    proposal.vote_mode = vote_mode;
+    proposal.total_credits = total_credits;
 
     let room = &mut ctx.accounts.room;
     room.proposal_count = room.proposal_count.checked_add(1).unwrap();

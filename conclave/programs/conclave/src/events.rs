@@ -67,3 +67,14 @@ pub struct MemberKeyUpdated {
     pub wallet: Pubkey,
     pub timestamp: i64,
 }
+
+#[event]
+pub struct QuadraticVoteRevealed {
+    pub proposal: Pubkey,
+    pub voter: Pubkey,
+    pub vote_count: u32,
+    pub vote_choice: u8,
+    pub vote_yes_count: u32,
+    pub vote_no_count: u32,
+    pub timestamp: i64,
+}

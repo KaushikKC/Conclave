@@ -38,4 +38,12 @@ pub enum ConclaveError {
     UnauthorizedSender,
     #[msg("Vote commitment must be revealed before closing")]
     VoteNotRevealed,
+    #[msg("This proposal does not use quadratic voting")]
+    NotQuadraticProposal,
+    #[msg("Invalid vote count for quadratic voting")]
+    InvalidVoteCount,
+    #[msg("Vote count squared exceeds your voice credit allocation")]
+    InsufficientCredits,
+    #[msg("Invalid vote mode, must be 0 (standard) or 1 (quadratic)")]
+    InvalidVoteMode,
 }

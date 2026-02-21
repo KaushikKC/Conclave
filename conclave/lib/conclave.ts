@@ -87,6 +87,8 @@ export interface ProposalAccount {
   deadline: number;
   isFinalized: boolean;
   bump: number;
+  voteMode: number;    // 0 = standard, 1 = quadratic
+  totalCredits: number; // voice credits per voter (quadratic only)
 }
 
 export interface MemberAccount {

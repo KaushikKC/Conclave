@@ -19,6 +19,8 @@ export default function CreateProposalPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [deadlineInput, setDeadlineInput] = useState("");
+  const [voteMode, setVoteMode] = useState<0 | 1>(0);
+  const [totalCredits, setTotalCredits] = useState(100);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -49,6 +51,10 @@ export default function CreateProposalPage() {
       setError("Deadline must be a future date/time.");
       return;
     }
+    if (voteMode === 1 && totalCredits < 1) {
+      setError("Voice credits must be at least 1.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -58,7 +64,7 @@ export default function CreateProposalPage() {
       const proposalPda = getProposalPda(roomPubkey, t, program.programId);
 
       await program.methods
-        .createProposal(t, d, new anchor.BN(deadline))
+        .createProposal(t, d, new anchor.BN(deadline), voteMode, totalCredits)
         .accountsPartial({
           creator: wallet.publicKey,
           room: roomPubkey,
@@ -89,6 +95,7 @@ export default function CreateProposalPage() {
   const minDatetime = new Date();
   minDatetime.setMinutes(minDatetime.getMinutes() + 1);
   const minStr = minDatetime.toISOString().slice(0, 16);
+  const maxVotes = voteMode === 1 ? Math.floor(Math.sqrt(totalCredits)) : null;
 
   return (
     <div className="max-w-lg mx-auto px-4 py-10">
@@ -133,6 +140,68 @@ export default function CreateProposalPage() {
             className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white focus:border-conclave-accent focus:outline-none"
           />
         </div>
+
+        {/* Vote mode selector */}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Voting mode</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setVoteMode(0)}
+              className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-left transition-all ${
+                voteMode === 0
+                  ? "border-conclave-accent bg-conclave-accent/10 text-conclave-accent"
+                  : "border-conclave-border bg-conclave-dark text-conclave-muted hover:border-conclave-accent/50"
+              }`}
+            >
+              <div className="font-semibold mb-0.5">Standard</div>
+              <div className="text-xs opacity-75">Yes / No — 1 vote per member</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setVoteMode(1)}
+              className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-left transition-all ${
+                voteMode === 1
+                  ? "border-purple-500 bg-purple-500/10 text-purple-400"
+                  : "border-conclave-border bg-conclave-dark text-conclave-muted hover:border-purple-500/50"
+              }`}
+            >
+              <div className="font-semibold mb-0.5">Quadratic</div>
+              <div className="text-xs opacity-75">Voice credits — cost = votes²</div>
+            </button>
+          </div>
+        </div>
+
+        {/* Quadratic config */}
+        {voteMode === 1 && (
+          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-purple-400"></div>
+              <span className="text-sm font-medium text-purple-300">Quadratic voting settings</span>
+            </div>
+            <div>
+              <label className="block text-xs text-conclave-muted mb-1">
+                Voice credits per member
+              </label>
+              <input
+                type="number"
+                value={totalCredits}
+                onChange={(e) => setTotalCredits(Math.max(1, parseInt(e.target.value) || 1))}
+                min={1}
+                max={10000}
+                className="w-full rounded-lg border border-purple-500/30 bg-conclave-dark px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
+              />
+              {maxVotes !== null && (
+                <p className="text-xs text-conclave-muted mt-1">
+                  Max {maxVotes} votes per member (√{totalCredits} = {maxVotes})
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-conclave-muted">
+              Members allocate up to {totalCredits} credits. Casting k votes costs k² credits — this penalises extreme positions and gives minorities more power.
+            </p>
+          </div>
+        )}
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 

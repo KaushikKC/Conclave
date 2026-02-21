@@ -132,6 +132,28 @@ export async function createVoteCommitment(
   };
 }
 
+/**
+ * Create a quadratic vote commitment: sha256(vote_count_le(4) || vote_choice(1) || nonce(32))
+ * vote_count votes in direction vote_choice costs vote_count² voice credits.
+ * Returns { commitment, nonce } — store both locally, send commitment on-chain via cast_vote.
+ */
+export async function createQuadraticVoteCommitment(
+  voteCount: number,
+  voteChoice: 0 | 1,
+): Promise<{ commitment: Uint8Array; nonce: Uint8Array }> {
+  const nonce = nacl.randomBytes(32);
+  const data = new Uint8Array(37); // 4 (u32 LE) + 1 (choice) + 32 (nonce)
+  const view = new DataView(data.buffer);
+  view.setUint32(0, voteCount, true); // little-endian, matches Rust to_le_bytes()
+  data[4] = voteChoice;
+  data.set(nonce, 5);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return {
+    commitment: new Uint8Array(hashBuffer),
+    nonce,
+  };
+}
+
 // --- Key Rotation ---
 
 /**

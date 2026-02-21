@@ -11,6 +11,10 @@ pub struct Proposal {
     pub deadline: i64,
     pub is_finalized: bool,
     pub bump: u8,
+    /// 0 = standard yes/no, 1 = quadratic voting
+    pub vote_mode: u8,
+    /// Voice credits per voter for quadratic mode (0 for standard)
+    pub total_credits: u32,
 }
 
 impl Proposal {
@@ -26,7 +30,9 @@ impl Proposal {
         + 4                      // vote_no_count
         + 8                      // deadline
         + 1                      // is_finalized
-        + 1;                     // bump
+        + 1                      // bump
+        + 1                      // vote_mode
+        + 4;                     // total_credits
 }
 
 #[account]

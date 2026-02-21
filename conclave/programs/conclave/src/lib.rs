@@ -10,6 +10,7 @@ pub use instructions::join_room::*;
 pub use instructions::create_proposal::*;
 pub use instructions::cast_vote::*;
 pub use instructions::reveal_vote::*;
+pub use instructions::reveal_quadratic_vote::*;
 pub use instructions::send_message::*;
 pub use instructions::finalize_proposal::*;
 pub use instructions::close_message::*;
@@ -35,8 +36,10 @@ pub mod conclave {
         title: String,
         description: String,
         deadline: i64,
+        vote_mode: u8,
+        total_credits: u32,
     ) -> Result<()> {
-        instructions::create_proposal::handler(ctx, title, description, deadline)
+        instructions::create_proposal::handler(ctx, title, description, deadline, vote_mode, total_credits)
     }
 
     pub fn cast_vote(ctx: Context<CastVote>, commitment: [u8; 32]) -> Result<()> {
@@ -57,6 +60,15 @@ pub mod conclave {
         timestamp: i64,
     ) -> Result<()> {
         instructions::send_message::handler(ctx, ciphertext, timestamp)
+    }
+
+    pub fn reveal_quadratic_vote(
+        ctx: Context<RevealQuadraticVote>,
+        vote_count: u32,
+        vote_choice: u8,
+        nonce: [u8; 32],
+    ) -> Result<()> {
+        instructions::reveal_quadratic_vote::handler(ctx, vote_count, vote_choice, nonce)
     }
 
     pub fn finalize_proposal(ctx: Context<FinalizeProposal>) -> Result<()> {
