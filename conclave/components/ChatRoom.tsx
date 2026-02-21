@@ -6,7 +6,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../hooks/useConclaveProgram";
 import { getMessagePda } from "../lib/conclave";
 import { decryptMessage, encryptMessage } from "../app/sdk/crypto";
-import { fetchRoomMessages, postMessage, deleteMessageFromIndexer } from "../lib/api";
+import { fetchRoomMessages, postMessage, deleteMessageFromIndexer, fetchReputationBatch, ApiReputation } from "../lib/api";
 import { getAnonAlias } from "../lib/anon";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
@@ -40,6 +40,8 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [repMap, setRepMap] = useState<Record<string, ApiReputation>>({});
+  const repFetchedRef = useRef<Set<string>>(new Set());
   const [ephemeral, setEphemeral] = useState(false);
   const [ephemeralDuration, setEphemeralDuration] = useState(60); // default 1 min
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
@@ -137,6 +139,18 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     const interval = setInterval(loadMessages, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [loadMessages]);
+
+  // Fetch reputation for new unique senders (cached per session to avoid repeated calls)
+  useEffect(() => {
+    const newWallets = messages
+      .map((m) => m.sender)
+      .filter((w, i, arr) => arr.indexOf(w) === i && !repFetchedRef.current.has(w));
+    if (newWallets.length === 0) return;
+    newWallets.forEach((w) => repFetchedRef.current.add(w));
+    fetchReputationBatch(newWallets).then((batch) => {
+      setRepMap((prev) => ({ ...prev, ...batch }));
+    });
+  }, [messages]);
 
   // Auto-hide expired ephemeral messages (frontend-only, no on-chain tx)
   useEffect(() => {
@@ -239,6 +253,21 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     return isMe ? `${alias} (you)` : alias;
   };
 
+  const tierBadge = (addr: string) => {
+    const rep = repMap[addr];
+    if (!rep || rep.tier === "none") return null;
+    const styles: Record<string, string> = {
+      bronze: "text-amber-500",
+      silver: "text-gray-300",
+      gold:   "text-yellow-400",
+    };
+    return (
+      <span className={`text-[9px] font-bold ${styles[rep.tier]}`} title={`${rep.tier} — ${rep.total} actions`}>
+        ◆
+      </span>
+    );
+  };
+
   const formatCountdown = (expiresAt: number) => {
     const remaining = expiresAt - now;
     if (remaining <= 0) return "expiring...";
@@ -252,8 +281,9 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         {loading && <p className="text-conclave-muted text-sm">Loading...</p>}
         {messages.map((m) => (
           <div key={m.publicKey || m.timestamp} className="text-sm">
-            <span className="text-conclave-accent font-medium">
+            <span className="inline-flex items-center gap-1 text-conclave-accent font-medium">
               {anonName(m.sender)}
+              {tierBadge(m.sender)}
             </span>
             <span className="text-conclave-muted mx-2">&middot;</span>
             <span className="text-gray-300">{m.text}</span>

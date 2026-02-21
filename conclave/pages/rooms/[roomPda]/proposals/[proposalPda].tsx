@@ -289,22 +289,31 @@ export default function ProposalDetailPage() {
         return;
       }
     } else {
-      if (!groupKey) { setError("Cannot recover vote data without group key."); return; }
       const encB64 = await fetchVoteData(proposalPda, wallet.publicKey.toBase58());
       if (!encB64) { setError("Vote data not found. It may have been lost."); return; }
-      try {
-        const encrypted = Uint8Array.from(atob(encB64), (c) => c.charCodeAt(0));
-        const decrypted = decryptMessage(groupKey, encrypted);
-        const parsed = JSON.parse(decrypted);
-        voteChoice = parsed.voteChoice;
-        nonceArr = parsed.nonce;
-        isQuadraticVote = !!parsed.isQuadratic;
-        if (isQuadraticVote) voteCount = parsed.voteCount;
-        localStorage.setItem(VOTE_STORAGE_PREFIX + proposalPda, decrypted);
-      } catch {
-        setError("Failed to decrypt vote data from server.");
-        return;
+
+      let parsed: any = null;
+      // Case 1: Blink vote — data stored as plain JSON (no group key available during blink)
+      try { parsed = JSON.parse(encB64); } catch { /* not plain JSON */ }
+
+      // Case 2: App vote — data stored as base64(encrypted(JSON))
+      if (!parsed) {
+        if (!groupKey) { setError("Cannot recover vote data without group key."); return; }
+        try {
+          const encrypted = Uint8Array.from(atob(encB64), (c) => c.charCodeAt(0));
+          const decrypted = decryptMessage(groupKey, encrypted);
+          parsed = JSON.parse(decrypted);
+        } catch {
+          setError("Failed to decrypt vote data from server.");
+          return;
+        }
       }
+
+      voteChoice = parsed.voteChoice;
+      nonceArr = parsed.nonce;
+      isQuadraticVote = !!parsed.isQuadratic;
+      if (isQuadraticVote) voteCount = parsed.voteCount;
+      localStorage.setItem(VOTE_STORAGE_PREFIX + proposalPda, JSON.stringify(parsed));
     }
 
     if (voteChoice! !== 0 && voteChoice! !== 1) { setError("Invalid vote choice."); return; }

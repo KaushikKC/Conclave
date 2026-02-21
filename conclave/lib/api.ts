@@ -267,6 +267,39 @@ export async function postRoomRealm(
   }
 }
 
+// --- Reputation ---
+
+export interface ApiReputation {
+  votes_cast: number;
+  proposals_created: number;
+  messages_sent: number;
+  total: number;
+  tier: "none" | "bronze" | "silver" | "gold";
+}
+
+/** Fetch anonymous reputation for a single wallet */
+export async function fetchReputation(wallet: string): Promise<ApiReputation | null> {
+  try {
+    return await fetchJSON<ApiReputation>(`/reputation/${wallet}`);
+  } catch {
+    return null;
+  }
+}
+
+/** Batch fetch reputation for multiple wallets (max 50) */
+export async function fetchReputationBatch(
+  wallets: string[],
+): Promise<Record<string, ApiReputation>> {
+  if (wallets.length === 0) return {};
+  try {
+    return await fetchJSON<Record<string, ApiReputation>>(
+      `/reputation/batch?wallets=${wallets.join(",")}`,
+    );
+  } catch {
+    return {};
+  }
+}
+
 export async function postGroupKeyWithRetry(
   roomAddress: string,
   groupKeyBase64: string,

@@ -709,6 +709,32 @@ app.post("/notify", async (req, res) => {
   res.json({ ok: true, indexed });
 });
 
+// GET /reputation/:wallet — compute anonymous reputation from existing activity data
+app.get("/reputation/:wallet", (req, res) => {
+  const wallet = req.params.wallet;
+  const votes = (db.prepare("SELECT COUNT(*) as count FROM vote_commitments WHERE voter = ?").get(wallet) as any).count as number;
+  const proposals = (db.prepare("SELECT COUNT(*) as count FROM proposals WHERE creator = ?").get(wallet) as any).count as number;
+  const messages = (db.prepare("SELECT COUNT(*) as count FROM messages WHERE sender = ?").get(wallet) as any).count as number;
+  const total = votes + proposals + messages;
+  const tier = total >= 10 ? "gold" : total >= 5 ? "silver" : total >= 1 ? "bronze" : "none";
+  res.json({ votes_cast: votes, proposals_created: proposals, messages_sent: messages, total, tier });
+});
+
+// GET /reputation/batch?wallets=w1,w2,... — batch reputation lookup
+app.get("/reputation/batch", (req, res) => {
+  const raw = typeof req.query.wallets === "string" ? req.query.wallets : "";
+  const wallets = raw.split(",").filter(Boolean).slice(0, 50);
+  const result: Record<string, { votes_cast: number; proposals_created: number; messages_sent: number; total: number; tier: string }> = {};
+  for (const wallet of wallets) {
+    const votes = (db.prepare("SELECT COUNT(*) as count FROM vote_commitments WHERE voter = ?").get(wallet) as any).count as number;
+    const proposals = (db.prepare("SELECT COUNT(*) as count FROM proposals WHERE creator = ?").get(wallet) as any).count as number;
+    const messages = (db.prepare("SELECT COUNT(*) as count FROM messages WHERE sender = ?").get(wallet) as any).count as number;
+    const total = votes + proposals + messages;
+    result[wallet] = { votes_cast: votes, proposals_created: proposals, messages_sent: messages, total, tier: total >= 10 ? "gold" : total >= 5 ? "silver" : total >= 1 ? "bronze" : "none" };
+  }
+  res.json(result);
+});
+
 // GET /health
 app.get("/health", (_req, res) => {
   const roomCount = db
