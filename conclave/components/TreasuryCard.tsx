@@ -100,77 +100,114 @@ export default function TreasuryCard({ roomPda, roomAuthority }: TreasuryCardPro
   };
 
   if (treasuryExists === null) {
-    return <p className="text-conclave-muted text-sm">Loading treasury…</p>;
+    return (
+      <div className="flex justify-center py-6 animate-fadeIn">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce"></div>
+          <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+          <div className="w-2 h-2 rounded-full bg-green-400 animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Treasury Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
         <div>
-          <h3 className="font-semibold text-white">Room Treasury</h3>
+          <h3 className="text-xs font-black text-white uppercase tracking-widest mb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,0.8)] animate-pulse"></span>
+            Workspace Treasury
+          </h3>
           {treasuryExists ? (
-            <p className="text-2xl font-bold text-conclave-accent mt-1">
-              {balance !== null ? `${balance.toFixed(4)} SOL` : "—"}
+            <p className="text-3xl font-black text-green-400 drop-shadow-[0_0_15px_rgba(74,222,128,0.3)]">
+              {balance !== null ? `${balance.toFixed(4)} ` : "— "}
+              <span className="text-sm text-green-400/60">SOL</span>
             </p>
           ) : (
-            <p className="text-conclave-muted text-sm mt-1">Not initialized yet</p>
+            <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted bg-black/40 px-3 py-1.5 rounded-xl border border-white/5 inline-block">
+              Not Initialized
+            </p>
           )}
         </div>
-        <button onClick={loadBalance} className="text-conclave-accent text-xs hover:underline">
+        <button
+          onClick={loadBalance}
+          className="text-[10px] uppercase font-bold tracking-widest text-green-400 hover:text-white transition-colors self-start sm:self-auto bg-green-500/10 px-4 py-2 rounded-xl border border-green-500/20 hover:bg-green-500/20"
+        >
           Refresh
         </button>
       </div>
 
+      {/* Initialization (Authority only) */}
       {!treasuryExists && isAuthority && (
-        <div>
-          <p className="text-conclave-muted text-sm mb-2">
-            Initialize the treasury to enable SOL-backed proposal execution.
-          </p>
-          <button
-            onClick={handleInit}
-            disabled={initLoading}
-            className="btn-primary text-sm disabled:opacity-50"
-          >
-            {initLoading ? "Initializing…" : "Initialize Treasury"}
-          </button>
-        </div>
-      )}
-
-      {treasuryExists && (
-        <div>
-          <label className="block text-xs text-conclave-muted mb-1">Fund treasury (SOL)</label>
-          <div className="flex gap-2">
-            <input
-              type="number"
-              step="0.001"
-              min="0.001"
-              value={fundAmount}
-              onChange={(e) => setFundAmount(e.target.value)}
-              className="w-32 bg-conclave-dark border border-conclave-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-conclave-accent"
-            />
+        <div className="bg-gradient-to-br from-green-500/10 to-black/40 p-6 rounded-2xl border border-green-500/20 relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-green-400/10 rounded-full mix-blend-screen filter blur-[40px] z-0 pointer-events-none group-hover:bg-green-400/20 transition-all duration-500"></div>
+          <div className="relative z-10">
+            <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed mb-6">
+              Initialize the treasury to enable SOL-backed automatic proposal execution. This allows the DAO to hold and distribute funds.
+            </p>
             <button
-              onClick={handleFund}
-              disabled={fundLoading}
-              className="btn-primary text-sm disabled:opacity-50"
+              onClick={handleInit}
+              disabled={initLoading}
+              className="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-green-600 to-green-400 hover:from-green-500 hover:to-green-300 text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:grayscale shadow-[0_0_20px_rgba(74,222,128,0.2)]"
             >
-              {fundLoading ? "Funding…" : "Fund"}
+              {initLoading ? "Initializing On-Chain…" : "Initialize Treasury"}
             </button>
           </div>
         </div>
       )}
 
-      {!treasuryExists && !isAuthority && (
-        <p className="text-conclave-muted text-sm italic">
-          The room authority needs to initialize the treasury first.
-        </p>
+      {/* Funding Form */}
+      {treasuryExists && (
+        <div className="bg-black/40 p-6 rounded-2xl border border-white/5">
+          <label className="block text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-3">
+            Fund Treasury <span className="text-green-400">(SOL)</span>
+          </label>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-conclave-textMuted font-mono">◎</span>
+              <input
+                type="number"
+                step="0.001"
+                min="0.001"
+                value={fundAmount}
+                onChange={(e) => setFundAmount(e.target.value)}
+                className="w-full bg-black/50 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white focus:outline-none focus:border-green-400/50 focus:shadow-[0_0_15px_rgba(74,222,128,0.1)] transition-all font-mono"
+              />
+            </div>
+            <button
+              onClick={handleFund}
+              disabled={fundLoading}
+              className="px-8 py-3 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500/20 hover:border-green-500/40 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50"
+            >
+              {fundLoading ? "Processing…" : "Fund"}
+            </button>
+          </div>
+        </div>
       )}
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
-      {success && <p className="text-green-400 text-sm">{success}</p>}
+      {/* Not Initialized Note */}
+      {!treasuryExists && !isAuthority && (
+        <div className="text-center p-6 bg-black/40 rounded-2xl border border-white/5">
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted italic">
+            The workspace authority must initialize the treasury first.
+          </p>
+        </div>
+      )}
 
+      {/* Status Messages */}
+      {(error || success) && (
+        <div className={`p-4 rounded-xl text-[10px] uppercase font-bold tracking-widest ${error ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-green-500/10 text-green-400 border border-green-500/20"
+          }`}>
+          {error || success}
+        </div>
+      )}
+
+      {/* Footer Note */}
       {treasuryExists && (
-        <p className="text-[10px] text-conclave-muted border-t border-conclave-border/30 pt-2">
-          Winning proposals can trigger SOL transfers from this treasury — governance with teeth.
+        <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted/60 text-center px-4">
+          Winning proposals can automatically trigger solvent transfers from this treasury — governance with teeth.
         </p>
       )}
     </div>

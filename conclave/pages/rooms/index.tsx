@@ -123,36 +123,44 @@ export default function RoomsListPage() {
   const displayRooms = tab === "my" ? myRooms : allRooms;
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-10">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Rooms</h1>
-        <Link href="/rooms/create" className="btn-primary">
-          Create room
+    <div className="max-w-5xl mx-auto px-6 py-16 relative">
+      {/* Background blobs for this page too */}
+      <div className="absolute top-20 -left-64 w-96 h-96 bg-conclave-pink/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0 pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-64 w-96 h-96 bg-conclave-blue/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000 z-0 pointer-events-none"></div>
+
+      <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between mb-12 gap-6">
+        <div>
+          <h1 className="text-4xl md:text-5xl font-black text-conclave-text uppercase tracking-widest mb-2 flex items-center gap-4">
+            <div className="w-3 h-3 bg-conclave-pink rounded-full shadow-[0_0_15px_rgba(255,77,141,0.8)] animate-pulse"></div>
+            Governance Rooms
+          </h1>
+          <p className="text-sm text-conclave-textMuted uppercase tracking-widest font-medium">Join or create anonymous workspaces</p>
+        </div>
+        <Link href="/rooms/create" className="btn-primary shadow-[0_0_30px_rgba(237,224,212,0.15)] mt-4 md:mt-0">
+          + Create Room
         </Link>
       </div>
 
       {/* Tabs */}
       {connected && (
-        <div className="flex gap-2 mb-6">
+        <div className="relative z-10 flex gap-4 mb-10 border-b border-white/10 pb-4">
           <button
             onClick={() => setTab("my")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              tab === "my"
-                ? "bg-conclave-accent/20 border border-conclave-accent text-conclave-accent"
-                : "border border-conclave-border text-conclave-muted hover:text-white"
-            }`}
+            className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 ${tab === "my"
+              ? "bg-conclave-pink text-conclave-dark shadow-[0_0_20px_rgba(255,77,141,0.4)] transform scale-105"
+              : "bg-white/5 border border-white/10 text-conclave-textMuted hover:text-white hover:bg-white/10"
+              }`}
           >
-            My Rooms ({myRooms.length})
+            My Rooms <span className="ml-2 bg-black/20 px-2 py-0.5 rounded-full">{myRooms.length}</span>
           </button>
           <button
             onClick={() => setTab("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-              tab === "all"
-                ? "bg-conclave-accent/20 border border-conclave-accent text-conclave-accent"
-                : "border border-conclave-border text-conclave-muted hover:text-white"
-            }`}
+            className={`px-6 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all duration-300 ${tab === "all"
+              ? "bg-conclave-blue text-conclave-dark shadow-[0_0_20px_rgba(0,184,241,0.4)] transform scale-105"
+              : "bg-white/5 border border-white/10 text-conclave-textMuted hover:text-white hover:bg-white/10"
+              }`}
           >
-            All Rooms ({allRooms.length})
+            All Rooms <span className="ml-2 bg-black/20 px-2 py-0.5 rounded-full">{allRooms.length}</span>
           </button>
         </div>
       )}
@@ -171,9 +179,9 @@ export default function RoomsListPage() {
               >
                 Browse all rooms
               </button>
-              <Link href="/rooms/create" className="btn-primary inline-block">
+              {/* <Link href="/rooms/create" className="btn-primary inline-block">
                 Create a room
-              </Link>
+              </Link> */}
             </>
           ) : (
             <>
@@ -187,42 +195,60 @@ export default function RoomsListPage() {
       )}
 
       {!loading && displayRooms.length > 0 && (
-        <ul className="space-y-3">
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-6">
           {displayRooms.map((room) => (
-            <li key={room.publicKey}>
-              <Link
-                href={`/rooms/${room.publicKey}`}
-                className="card block hover:border-conclave-accent/50 transition"
-              >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-semibold text-white">{room.name}</h2>
-                      {room.realmAddress && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
-                          Realms
-                        </span>
-                      )}
-                      {tab === "my" && wallet && room.authority === wallet.toBase58() && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-conclave-accent/20 text-conclave-accent border border-conclave-accent/30 font-medium">
-                          Creator
-                        </span>
-                      )}
+            <Link
+              key={room.publicKey}
+              href={`/rooms/${room.publicKey}`}
+              className="group block relative rounded-3xl border border-white/10 bg-conclave-card/40 p-6 sm:p-8 backdrop-blur-md overflow-hidden transform transition-all duration-500 hover:scale-[1.02] hover:bg-white/5 hover:border-white/20 hover:shadow-[0_15px_40px_rgba(0,0,0,0.5)]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-conclave-text/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+
+              <div className="relative z-10 flex flex-col h-full justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-bold text-conclave-text uppercase tracking-wider">{room.name}</h2>
+                    <div className="w-8 h-8 rounded-full bg-conclave-dark border border-white/20 flex items-center justify-center transform transition-transform group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:bg-conclave-text group-hover:text-conclave-dark">
+                      <span className="text-lg font-bold leading-none">&rarr;</span>
                     </div>
-                    <p className="text-sm text-conclave-muted mt-1">
-                      {room.memberCount} members · {room.proposalCount}{" "}
-                      proposals
-                    </p>
-                    <p className="text-xs text-conclave-muted mt-1 font-mono truncate max-w-md">
-                      Mint: {room.governanceMint}
-                    </p>
                   </div>
-                  <span className="text-conclave-accent text-sm">Open &rarr;</span>
+
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {room.realmAddress && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
+                        Realms Linked
+                      </span>
+                    )}
+                    {tab === "my" && wallet && room.authority === wallet.toBase58() && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full bg-conclave-yellow/10 text-conclave-yellow border border-conclave-yellow/20">
+                        <div className="w-1.5 h-1.5 rounded-full bg-conclave-yellow"></div>
+                        Creator
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-xs text-conclave-textMuted uppercase tracking-widest border-b border-white/5 pb-2">
+                      <span>Members</span>
+                      <span className="text-conclave-text font-bold text-sm">{room.memberCount} <span className="text-[10px] font-normal text-conclave-textMuted">Anon</span></span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-conclave-textMuted uppercase tracking-widest border-b border-white/5 pb-2">
+                      <span>Proposals</span>
+                      <span className="text-conclave-text font-bold text-sm">{room.proposalCount}</span>
+                    </div>
+                  </div>
                 </div>
-              </Link>
-            </li>
+
+                <div className="mt-8 pt-4 border-t border-white/10">
+                  <p className="text-[10px] text-conclave-textMuted uppercase tracking-widest font-mono truncate">
+                    Mint <span className="text-conclave-text/70">{room.governanceMint}</span>
+                  </p>
+                </div>
+              </div>
+            </Link>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

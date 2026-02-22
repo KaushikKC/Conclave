@@ -170,7 +170,7 @@ const deleteVoteCommitment = db.prepare(
 
 // --- IDL Loading ---
 
-const idlPath = path.join(__dirname, "..", "target", "idl", "conclave.json");
+const idlPath = path.join(__dirname, "..", "lib", "idl", "conclave.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 const accountsCoder = new anchor.BorshAccountsCoder(idl);
 

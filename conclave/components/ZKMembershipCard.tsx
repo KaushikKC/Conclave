@@ -237,278 +237,305 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
   }, [verifyPaste]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 animate-fadeIn">
       {/* Header */}
-      <div className="rounded-xl border border-conclave-border bg-conclave-dark/50 p-5">
-        <div className="flex items-center gap-3 mb-3">
-          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30 font-medium">
-            ZK — Groth16
-          </span>
-          <h3 className="font-semibold text-white">Anonymous Membership Proof</h3>
-        </div>
-        <p className="text-conclave-muted text-sm leading-relaxed">
-          Prove you hold governance tokens <span className="text-white font-medium">without revealing your wallet</span>.
-          Uses a Semaphore Poseidon Merkle circuit — a real Groth16 zero-knowledge proof generated entirely in your browser.
-        </p>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-lg border border-conclave-border/50 bg-conclave-dark p-2">
-            <p className="text-white font-medium">{groupSize}</p>
-            <p className="text-conclave-muted">ZK Members</p>
+      <div className="rounded-3xl border border-white/5 bg-black/40 p-6 sm:p-8 backdrop-blur-xl shadow-inner relative overflow-hidden group hover:border-violet-500/20 transition-all">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-violet-500/10 rounded-full mix-blend-screen filter blur-[50px] z-0 pointer-events-none group-hover:bg-violet-500/20 transition-all duration-500"></div>
+        <div className="relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] px-3 py-1 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30 font-bold uppercase tracking-widest shadow-[0_0_15px_rgba(139,92,246,0.2)]">
+                ZK — Groth16
+              </span>
+              <h3 className="font-black text-white uppercase tracking-widest text-lg">Anonymous Membership Proof</h3>
+            </div>
           </div>
-          <div className="rounded-lg border border-conclave-border/50 bg-conclave-dark p-2">
-            <p className="text-white font-medium">Groth16</p>
-            <p className="text-conclave-muted">Proof System</p>
-          </div>
-          <div className="rounded-lg border border-conclave-border/50 bg-conclave-dark p-2">
-            <p className="text-white font-medium">Poseidon</p>
-            <p className="text-conclave-muted">Hash (ZK-friendly)</p>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed mb-6 max-w-2xl">
+            Prove you hold governance tokens <span className="text-white">without revealing your wallet</span>.
+            Uses a Semaphore Poseidon Merkle circuit — a real Groth16 zero-knowledge proof generated entirely in your browser.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-white/5 bg-white/5 p-4 text-center shadow-inner">
+              <p className="text-2xl font-black text-white mb-1 drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{groupSize}</p>
+              <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted">ZK Members</p>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/5 p-4 text-center shadow-inner">
+              <p className="text-lg font-black text-white mb-1 uppercase tracking-widest mt-1">Groth16</p>
+              <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mt-2">Proof System</p>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/5 p-4 text-center shadow-inner hidden sm:block">
+              <p className="text-lg font-black text-white mb-1 uppercase tracking-widest mt-1">Poseidon</p>
+              <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mt-2">Hash Function</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Step 1 — Register Identity */}
-      <div
-        className={`rounded-xl border p-4 transition ${
-          step === "none"
-            ? "border-violet-500/40 bg-violet-500/5"
-            : "border-conclave-border/50 bg-conclave-dark/30"
-        }`}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-              step !== "none"
-                ? "bg-green-500 text-white"
-                : "bg-violet-500/30 text-violet-400"
-            }`}
-          >
-            {step !== "none" ? "✓" : "1"}
-          </span>
-          <span className="text-sm font-medium text-white">
-            Generate ZK Identity
-          </span>
-        </div>
-        <p className="text-xs text-conclave-muted mb-3 pl-7">
-          Sign a message to derive your anonymous Semaphore identity. Your wallet signature is hashed — the on-chain commitment reveals nothing about which wallet you used.
-        </p>
+      <div className={`rounded-3xl border transition-all duration-500 p-6 sm:p-8 backdrop-blur-xl shadow-inner relative overflow-hidden ${step === "none"
+          ? "border-violet-500/30 bg-gradient-to-br from-violet-900/10 to-black/40 shadow-[0_0_30px_rgba(139,92,246,0.05)]"
+          : "border-white/5 bg-black/40 opacity-70 hover:opacity-100"
+        }`}>
+        <div className="relative z-10">
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-inner ${step !== "none"
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+              }`}>
+              {step !== "none" ? "✓" : "1"}
+            </div>
+            <h4 className="text-sm font-black text-white uppercase tracking-widest">Generate ZK Identity</h4>
+          </div>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted pl-12 mb-6 leading-relaxed max-w-2xl">
+            Sign a message to derive your anonymous Semaphore identity. Your wallet signature is hashed — the on-chain commitment reveals nothing about which wallet you used.
+          </p>
 
-        {step === "none" ? (
-          <div className="pl-7">
-            <button
-              onClick={handleRegister}
-              disabled={loading || !isMember}
-              className="btn-primary text-sm disabled:opacity-50"
-              title={!isMember ? "You must be a room member first" : ""}
-            >
-              {loading && status.includes("identity")
-                ? "Generating..."
-                : "Generate & Register Identity"}
-            </button>
-            {!isMember && (
-              <p className="text-xs text-yellow-400 mt-2">
-                Join the room first to register a ZK identity.
-              </p>
+          <div className="pl-12">
+            {step === "none" ? (
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <button
+                  onClick={handleRegister}
+                  disabled={loading || !isMember}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600/80 to-violet-400/80 hover:from-violet-500 hover:to-violet-300 text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:grayscale shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+                  title={!isMember ? "You must be a room member first" : ""}
+                >
+                  {loading && status.includes("identity")
+                    ? "Generating..."
+                    : "Generate & Register Identity"}
+                </button>
+                {!isMember && (
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-conclave-yellow bg-conclave-yellow/10 px-3 py-1.5 rounded-lg border border-conclave-yellow/20">
+                    Join the room first
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-green-400 bg-green-500/10 px-3 py-1.5 rounded-lg border border-green-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                  Identity Registered
+                </div>
+                <div className="rounded-2xl bg-black/60 border border-white/5 p-4 max-w-2xl shadow-inner">
+                  <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">Your commitment (public, unlinkable)</p>
+                  <p className="text-xs font-mono text-violet-300 break-all bg-white/5 p-3 rounded-xl border border-white/5">
+                    {shortHex(commitment, 20)}
+                  </p>
+                </div>
+              </div>
             )}
           </div>
-        ) : (
-          <div className="pl-7 space-y-1">
-            <p className="text-xs text-green-400">Identity registered</p>
-            <div className="rounded-lg bg-conclave-dark border border-conclave-border/50 p-2">
-              <p className="text-[10px] text-conclave-muted mb-0.5">Your commitment (public, unlinkable to wallet)</p>
-              <p className="text-[10px] font-mono text-violet-300 break-all">
-                {shortHex(commitment, 20)}
-              </p>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Step 2 — Generate ZK Proof */}
-      <div
-        className={`rounded-xl border p-4 transition ${
-          step === "registered"
-            ? "border-violet-500/40 bg-violet-500/5"
-            : step === "proved"
-            ? "border-green-500/30 bg-green-500/5"
-            : "border-conclave-border/50 bg-conclave-dark/30 opacity-50"
-        }`}
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-              step === "proved"
-                ? "bg-green-500 text-white"
+      <div className={`rounded-3xl border transition-all duration-500 p-6 sm:p-8 backdrop-blur-xl shadow-inner relative overflow-hidden ${step === "registered"
+          ? "border-violet-500/30 bg-gradient-to-br from-violet-900/10 to-black/40 shadow-[0_0_30px_rgba(139,92,246,0.05)]"
+          : step === "proved"
+            ? "border-green-500/20 bg-gradient-to-br from-green-900/10 to-black/40"
+            : "border-white/5 bg-black/40 opacity-50 grayscale"
+        }`}>
+        <div className="relative z-10">
+          <div className="flex items-center gap-4 mb-4">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black shadow-inner transition-colors ${step === "proved"
+                ? "bg-green-500/20 text-green-400 border border-green-500/30 shadow-[0_0_15px_rgba(74,222,128,0.2)]"
                 : step === "registered"
-                ? "bg-violet-500/30 text-violet-400"
-                : "bg-conclave-border text-conclave-muted"
-            }`}
-          >
-            {step === "proved" ? "✓" : "2"}
-          </span>
-          <span className="text-sm font-medium text-white">
-            Prove Membership
-          </span>
+                  ? "bg-violet-500/20 text-violet-400 border border-violet-500/30 shadow-[0_0_15px_rgba(139,92,246,0.3)]"
+                  : "bg-white/5 text-conclave-textMuted border border-white/10"
+              }`}>
+              {step === "proved" ? "✓" : "2"}
+            </div>
+            <h4 className="text-sm font-black text-white uppercase tracking-widest">Prove Membership</h4>
+          </div>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted pl-12 mb-6 leading-relaxed max-w-2xl">
+            Generate a Groth16 proof that your commitment is a leaf in the group&apos;s Poseidon Merkle tree — without revealing <em>which</em> leaf.
+          </p>
+
+          <div className="pl-12">
+            {step === "registered" && (
+              <div>
+                <button
+                  onClick={handleProve}
+                  disabled={loading}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600/80 to-violet-400/80 hover:from-violet-500 hover:to-violet-300 text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:grayscale shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+                >
+                  {loading ? "Generating..." : "Generate ZK Proof"}
+                </button>
+                <div className="mt-4 inline-block bg-black/40 rounded-xl border border-white/5 p-3">
+                  <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-conclave-pink rounded-full"></span>
+                    First run downloads circuit artifacts (~28 MB) from PSE. Cached on reload.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {step === "proved" && proofDisplay && (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center gap-3">
+                  {proofDisplay.verified ? (
+                    <span className="text-[10px] px-3 py-1.5 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 font-bold uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> Proof Valid ✓
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-3 py-1.5 rounded-xl bg-yellow-500/10 text-conclave-yellow border border-yellow-500/20 font-bold uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-conclave-yellow animate-pulse"></span> Proof Generated
+                    </span>
+                  )}
+                  <button
+                    onClick={handleProve}
+                    disabled={loading}
+                    className="text-[9px] uppercase font-bold tracking-widest text-violet-400 hover:text-white transition-colors bg-violet-500/10 px-3 py-1.5 rounded-xl border border-violet-500/20 hover:bg-violet-500/20"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-3xl">
+                  <div className="rounded-2xl bg-black/60 border border-white/5 p-4 shadow-inner">
+                    <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">Merkle Root (state)</p>
+                    <p className="font-mono text-xs text-violet-300 break-all bg-white/5 p-2 rounded-lg">
+                      {shortHex(proofDisplay.merkleTreeRoot, 16)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-black/60 border border-white/5 p-4 shadow-inner">
+                    <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">Nullifier Hash</p>
+                    <p className="font-mono text-xs text-violet-300 break-all bg-white/5 p-2 rounded-lg">
+                      {shortHex(proofDisplay.nullifierHash, 16)}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-black/60 border border-white/5 p-4 shadow-inner">
+                    <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">π_A (packed)</p>
+                    <p className="font-mono text-[10px] text-violet-300/70 break-all bg-white/5 p-2 rounded-lg">
+                      [{shortHex(proofDisplay.proof[0] ?? "", 8)},<br />{shortHex(proofDisplay.proof[1] ?? "", 8)}]
+                    </p>
+                  </div>
+                  <div className="rounded-2xl bg-black/60 border border-white/5 p-4 shadow-inner">
+                    <p className="text-[9px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">π_C (packed)</p>
+                    <p className="font-mono text-[10px] text-violet-300/70 break-all bg-white/5 p-2 rounded-lg">
+                      [{shortHex(proofDisplay.proof[6] ?? "", 8)},<br />{shortHex(proofDisplay.proof[7] ?? "", 8)}]
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-violet-500/10 to-transparent p-5 rounded-2xl border-l-2 border-violet-500">
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-4">
+                    Share this proof so anyone can verify you are in this room.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const payload = {
+                        roomPda,
+                        merkleTreeRoot: proofDisplay.merkleTreeRoot,
+                        nullifierHash: proofDisplay.nullifierHash,
+                        externalNullifier: proofDisplay.externalNullifier,
+                        signal: "1",
+                        proof: proofDisplay.proof,
+                      };
+                      navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+                    }}
+                    className="inline-flex flex-row items-center gap-2 text-[10px] uppercase font-bold tracking-widest px-4 py-3 rounded-xl bg-black/40 border border-white/10 hover:bg-white/10 hover:text-white transition-all text-violet-300"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                    Copy Proof JSON
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        <p className="text-xs text-conclave-muted mb-3 pl-7">
-          Generate a Groth16 proof that your commitment is a leaf in the group&apos;s Poseidon Merkle tree — without revealing <em>which</em> leaf.
-        </p>
-
-        {step === "registered" && (
-          <div className="pl-7">
-            <button
-              onClick={handleProve}
-              disabled={loading}
-              className="btn-primary text-sm disabled:opacity-50"
-            >
-              {loading ? "Generating..." : "Generate ZK Proof"}
-            </button>
-            <p className="text-[10px] text-conclave-muted mt-2">
-              First run downloads circuit artifacts (~28 MB) from PSE. Cached on reload.
-            </p>
-          </div>
-        )}
-
-        {step === "proved" && proofDisplay && (
-          <div className="pl-7 space-y-2">
-            <div className="flex items-center gap-2">
-              {proofDisplay.verified ? (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/30 font-medium">
-                  Proof Valid ✓
-                </span>
-              ) : (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 font-medium">
-                  Proof Generated (vkey fetch needed for on-chain verify)
-                </span>
-              )}
-            </div>
-
-            <div className="rounded-lg bg-conclave-dark border border-conclave-border/50 p-3 space-y-2 text-[10px]">
-              <div>
-                <p className="text-conclave-muted mb-0.5">Merkle Root (group state)</p>
-                <p className="font-mono text-violet-300 break-all">
-                  {shortHex(proofDisplay.merkleTreeRoot, 18)}
-                </p>
-              </div>
-              <div>
-                <p className="text-conclave-muted mb-0.5">Nullifier Hash (prevents double-use)</p>
-                <p className="font-mono text-violet-300 break-all">
-                  {shortHex(proofDisplay.nullifierHash, 18)}
-                </p>
-              </div>
-              <div>
-                <p className="text-conclave-muted mb-0.5">π_A — G1 point (packed)</p>
-                <p className="font-mono text-violet-300/70 break-all">
-                  [{shortHex(proofDisplay.proof[0] ?? "", 10)}, {shortHex(proofDisplay.proof[1] ?? "", 10)}]
-                </p>
-              </div>
-              <div>
-                <p className="text-conclave-muted mb-0.5">π_C — G1 point (packed)</p>
-                <p className="font-mono text-violet-300/70 break-all">
-                  [{shortHex(proofDisplay.proof[6] ?? "", 10)}, {shortHex(proofDisplay.proof[7] ?? "", 10)}]
-                </p>
-              </div>
-            </div>
-
-            <p className="text-[10px] text-conclave-muted">
-              Share the proof JSON below so anyone can verify you are in this room’s ZK group (without revealing who you are).
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                const payload = {
-                  roomPda,
-                  merkleTreeRoot: proofDisplay.merkleTreeRoot,
-                  nullifierHash: proofDisplay.nullifierHash,
-                  externalNullifier: proofDisplay.externalNullifier,
-                  signal: "1",
-                  proof: proofDisplay.proof,
-                };
-                navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-              }}
-              className="text-xs text-violet-400 hover:underline"
-            >
-              Copy proof for verification
-            </button>
-
-            <button
-              onClick={handleProve}
-              disabled={loading}
-              className="text-xs text-violet-400 hover:underline disabled:opacity-50 ml-3"
-            >
-              Regenerate proof
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Status / Error */}
+      {/* Status / Error Messages */}
       {status && (
-        <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 p-3">
-          <p className="text-xs text-violet-300">
-            <span className="animate-pulse mr-1">◆</span>
+        <div className="rounded-2xl border border-violet-500/20 bg-violet-500/5 p-4 flex items-center gap-3 animate-fadeIn">
+          <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse"></div>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-violet-300">
             {status}
           </p>
         </div>
       )}
       {error && (
-        <p className="text-red-400 text-sm">{error}</p>
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 animate-fadeIn">
+          <p className="text-[10px] uppercase font-bold tracking-widest text-red-400">
+            {error}
+          </p>
+        </div>
       )}
 
-      {/* Verify a proof (anyone can do this) */}
-      <div className="rounded-xl border border-conclave-border/50 bg-conclave-dark/30 p-4">
-        <h4 className="text-sm font-medium text-white mb-2">Verify a proof</h4>
-        <p className="text-xs text-conclave-muted mb-2">
-          Paste a proof JSON (from &quot;Copy proof for verification&quot;) to verify that someone is in this room&apos;s ZK group — without learning who they are.
+      {/* Verify a proof */}
+      <div className="rounded-3xl border border-white/5 bg-black/40 p-6 sm:p-8 backdrop-blur-xl shadow-inner group transition-all hover:border-white/10">
+        <h4 className="text-sm font-black text-white uppercase tracking-widest mb-3 flex items-center gap-2">
+          Verify a Proof
+        </h4>
+        <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed mb-6 max-w-2xl">
+          Paste a proof JSON (from &quot;Copy Proof JSON&quot;) to verify that someone is in this room&apos;s ZK group — without learning who they are.
         </p>
-        <textarea
-          value={verifyPaste}
-          onChange={(e) => {
-            setVerifyPaste(e.target.value);
-            setVerifyResult("idle");
-          }}
-          placeholder='{"roomPda":"...","merkleTreeRoot":"...","nullifierHash":"...","externalNullifier":"...","signal":"1","proof":[...]}'
-          className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none text-xs font-mono h-24"
-          spellCheck={false}
-        />
-        <div className="flex items-center gap-2 mt-2">
-          <button
-            type="button"
-            onClick={handleVerifyProof}
-            disabled={verifyLoading || !verifyPaste.trim()}
-            className="btn-primary text-sm disabled:opacity-50"
-          >
-            {verifyLoading ? "Verifying…" : "Verify proof"}
-          </button>
-          {verifyResult === "valid" && (
-            <span className="text-xs text-green-400 font-medium">✓ Proof valid — prover is in this room&apos;s ZK group.</span>
-          )}
-          {verifyResult === "invalid" && (
-            <span className="text-xs text-red-400 font-medium">Proof invalid.</span>
-          )}
-          {verifyResult === "error" && (
-            <span className="text-xs text-red-400 font-medium">Invalid JSON or verification failed.</span>
-          )}
+
+        <div className="space-y-4">
+          <div className="relative group/textarea">
+            <textarea
+              value={verifyPaste}
+              onChange={(e) => {
+                setVerifyPaste(e.target.value);
+                setVerifyResult("idle");
+              }}
+              placeholder='{"roomPda":"...","merkleTreeRoot":"...", ...}'
+              className="w-full rounded-2xl border border-white/5 bg-black/60 px-4 py-4 text-white placeholder-white/20 focus:border-violet-500/50 focus:shadow-[0_0_20px_rgba(139,92,246,0.1)] focus:outline-none text-xs font-mono h-32 resize-none transition-all scrollbar-thin scrollbar-thumb-white/10"
+              spellCheck={false}
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <button
+              type="button"
+              onClick={handleVerifyProof}
+              disabled={verifyLoading || !verifyPaste.trim()}
+              className="px-6 py-3 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:grayscale disabled:hover:bg-white/10 flex items-center justify-center min-w-[120px]"
+            >
+              {verifyLoading ? "Verifying…" : "Verify Proof"}
+            </button>
+
+            {verifyResult === "valid" && (
+              <span className="text-[10px] px-4 py-3 rounded-xl bg-green-500/10 text-green-400 border border-green-500/20 font-bold uppercase tracking-widest flex items-center gap-2 animate-fadeIn">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span> Proof Valid
+              </span>
+            )}
+            {verifyResult === "invalid" && (
+              <span className="text-[10px] px-4 py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 font-bold uppercase tracking-widest flex items-center gap-2 animate-fadeIn">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span> Proof Invalid
+              </span>
+            )}
+            {verifyResult === "error" && (
+              <span className="text-[10px] px-4 py-3 rounded-xl bg-red-500/10 text-red-400 border border-red-500/20 font-bold uppercase tracking-widest flex items-center gap-2 animate-fadeIn">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-400"></span> Error parsing JSON
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* How it works */}
-      <details className="rounded-xl border border-conclave-border/30 p-4">
-        <summary className="text-xs text-conclave-muted cursor-pointer hover:text-white">
-          How does this work? ›
+      {/* Details/How it works */}
+      <details className="rounded-3xl border border-white/5 bg-black/40 p-6 backdrop-blur-xl group cursor-pointer transition-all hover:border-white/10">
+        <summary className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted group-hover:text-white transition-colors outline-none flex items-center justify-between">
+          How does this work?
+          <span className="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-xs group-open:rotate-180 transition-transform">↓</span>
         </summary>
-        <div className="mt-3 space-y-2 text-xs text-conclave-muted leading-relaxed">
+        <div className="mt-6 space-y-5 pt-6 border-t border-white/5 text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted/80 leading-relaxed font-sans">
           <p>
             <span className="text-white">1. Identity Generation:</span> Your wallet signs a deterministic message. The signature is hashed with Poseidon to derive two private scalars (trapdoor + nullifier). These never leave your browser.
           </p>
           <p>
             <span className="text-white">2. Commitment:</span>{" "}
-            <code className="text-violet-300">commitment = poseidon(poseidon(trapdoor, nullifier))</code> — a public value stored in the group, unlinkable to your wallet address.
+            <code className="text-violet-300 bg-violet-500/10 px-2 py-1 rounded-lg ml-1 font-mono lowercase tracking-normal border border-violet-500/20">commitment = poseidon(poseidon(trapdoor, nullifier))</code> <span className="block mt-2 opacity-70">— a public value stored in the group, unlinkable to your wallet address.</span>
           </p>
           <p>
             <span className="text-white">3. Merkle Tree:</span> All commitments form a depth-16 Poseidon Merkle tree (max 65,536 members).
           </p>
           <p>
-            <span className="text-white">4. ZK Proof:</span> A Groth16 proof certifies you know a trapdoor+nullifier whose commitment is a leaf in the tree, <em>without revealing which leaf</em>. Generated by snarkjs in your browser using PSE trusted setup circuits.
+            <span className="text-white">4. ZK Proof:</span> A Groth16 proof certifies you know a trapdoor+nullifier whose commitment is a leaf in the tree, <em className="text-violet-300 not-italic">without revealing which leaf</em>. Generated by snarkjs in your browser using PSE trusted setup circuits.
           </p>
           <p>
             <span className="text-white">5. Nullifier:</span> The nullifier hash is unique per identity+room — prevents the same identity from proving twice for the same scope.
@@ -518,12 +545,14 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
 
       {/* Reset */}
       {step !== "none" && (
-        <button
-          onClick={handleReset}
-          className="text-[10px] text-conclave-muted hover:text-red-400 transition"
-        >
-          Clear local identity
-        </button>
+        <div className="flex justify-center pt-4 pb-8">
+          <button
+            onClick={handleReset}
+            className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted/50 hover:text-red-400 transition-colors"
+          >
+            Clear local identity
+          </button>
+        </div>
       )}
     </div>
   );

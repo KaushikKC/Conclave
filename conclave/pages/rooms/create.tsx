@@ -369,15 +369,24 @@ export default function CreateRoomPage() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10">
-      <h1 className="text-2xl font-bold text-white mb-2">Create a room</h1>
-      <p className="text-conclave-muted mb-6">
-        Create a DAO room linked to your Realms governance or any SPL token.
-      </p>
+    <div className="max-w-2xl mx-auto px-6 py-16 relative">
+      {/* Background blobs */}
+      <div className="absolute top-0 -left-64 w-96 h-96 bg-conclave-pink/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0 pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-64 w-96 h-96 bg-conclave-blue/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000 z-0 pointer-events-none"></div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
+      <div className="relative z-10 text-center mb-12">
+        <h1 className="text-4xl font-black text-conclave-text uppercase tracking-widest mb-4 inline-flex items-center gap-4">
+          <div className="w-3 h-3 bg-conclave-pink rounded-full shadow-[0_0_15px_rgba(255,77,141,0.8)] animate-pulse"></div>
+          Create Workspace
+        </h1>
+        <p className="text-sm text-conclave-textMuted uppercase tracking-widest font-medium max-w-md mx-auto leading-relaxed">
+          Create an encrypted DAO room linked to your Realms governance or any SPL token.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="relative z-10 rounded-3xl border border-white/10 bg-conclave-card/60 p-8 sm:p-12 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] space-y-8">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">
             Room name
           </label>
           <input
@@ -385,39 +394,37 @@ export default function CreateRoomPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={MAX_NAME_LEN}
-            placeholder="e.g. My DAO"
-            className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none"
+            placeholder="e.g. Core Contributors"
+            className="w-full rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-white placeholder-conclave-textMuted focus:border-conclave-pink focus:shadow-[0_0_20px_rgba(255,77,141,0.2)] focus:outline-none transition-all font-medium text-lg"
           />
-          <p className="text-xs text-conclave-muted mt-1">
-            {name.length}/{MAX_NAME_LEN}
+          <p className="text-[10px] text-conclave-textMuted mt-2 uppercase tracking-widest text-right">
+            {name.length} / {MAX_NAME_LEN}
           </p>
         </div>
 
         {/* Mode selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
-            Governance token source
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">
+            Governance Token Source
           </label>
-          <div className="flex gap-2">
+          <div className="flex bg-black/50 p-1.5 rounded-xl border border-white/5 relative">
             <button
               type="button"
               onClick={() => { setMintMode("realms"); setError(""); }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                mintMode === "realms"
-                  ? "bg-conclave-accent/20 border border-conclave-accent text-conclave-accent"
-                  : "border border-conclave-border text-conclave-muted hover:text-white"
-              }`}
+              className={`flex-1 px-4 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${mintMode === "realms"
+                ? "bg-conclave-pink/10 border border-conclave-pink/20 text-conclave-pink shadow-[0_0_15px_rgba(255,77,141,0.2)]"
+                : "border border-transparent text-conclave-textMuted hover:text-white hover:bg-white/5"
+                }`}
             >
               Realms DAO
             </button>
             <button
               type="button"
               onClick={() => { setMintMode("custom"); setError(""); }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                mintMode === "custom"
-                  ? "bg-conclave-accent/20 border border-conclave-accent text-conclave-accent"
-                  : "border border-conclave-border text-conclave-muted hover:text-white"
-              }`}
+              className={`flex-1 px-4 py-3 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300 ${mintMode === "custom"
+                ? "bg-conclave-pink/10 border border-conclave-pink/20 text-conclave-pink shadow-[0_0_15px_rgba(255,77,141,0.2)]"
+                : "border border-transparent text-conclave-textMuted hover:text-white hover:bg-white/5"
+                }`}
             >
               Custom token
             </button>
@@ -426,12 +433,12 @@ export default function CreateRoomPage() {
 
         {/* Realms DAO mode */}
         {mintMode === "realms" && (
-          <div className="space-y-3">
+          <div className="space-y-5 animate-fadeIn">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Realm address
+              <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">
+                Realm Address
               </label>
-              <div className="flex gap-2">
+              <div className="flex gap-3">
                 <input
                   type="text"
                   value={realmAddressStr}
@@ -442,16 +449,16 @@ export default function CreateRoomPage() {
                     setRealmError("");
                     setGovernanceMintStr("");
                   }}
-                  placeholder="Realms DAO address (from app.realms.today)"
-                  className="flex-1 rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none font-mono text-sm"
+                  placeholder="Realm address from app.realms.today"
+                  className="flex-1 rounded-xl border border-white/10 bg-black/50 px-5 py-3 text-white placeholder-conclave-textMuted focus:border-conclave-blue focus:shadow-[0_0_20px_rgba(0,184,241,0.2)] focus:outline-none font-mono text-sm transition-all"
                 />
                 <button
                   type="button"
                   onClick={handleLookupRealm}
                   disabled={realmLoading}
-                  className="btn-secondary text-sm whitespace-nowrap disabled:opacity-50"
+                  className="btn-secondary whitespace-nowrap disabled:opacity-50 !py-3 !px-6 border-conclave-blue/50 text-conclave-blue hover:bg-conclave-blue/10 hover:border-conclave-blue"
                 >
-                  {realmLoading ? "Looking up..." : "Lookup"}
+                  {realmLoading ? "Looking up..." : "Link Realm"}
                 </button>
               </div>
             </div>
@@ -461,45 +468,45 @@ export default function CreateRoomPage() {
             )}
 
             {/* Create Realm on Devnet */}
-            <div className="rounded-lg border border-conclave-border/50 bg-conclave-dark/30 p-3">
+            <div className="rounded-xl border border-conclave-pink/20 bg-conclave-pink/5 p-5 transition-all">
               <button
                 type="button"
                 onClick={() => { setShowCreateRealm(!showCreateRealm); setCreateRealmError(""); }}
-                className="flex items-center justify-between w-full text-sm text-conclave-muted hover:text-white transition"
+                className="flex items-center justify-between w-full text-xs font-bold uppercase tracking-widest text-conclave-pink hover:text-white transition"
               >
-                <span>Don't have a Realm? Create one on devnet</span>
-                <span className="text-xs">{showCreateRealm ? "▲" : "▼"}</span>
+                <span>No Realm? Create on Devnet</span>
+                <span className="text-[10px] transform transition-transform" style={{ rotate: showCreateRealm ? '180deg' : '0deg' }}>▼</span>
               </button>
 
               {showCreateRealm && (
-                <div className="mt-3 space-y-3">
-                  <p className="text-xs text-conclave-muted">
-                    Creates a new Realms DAO on devnet with a fresh governance token.
-                    You'll sign 3 transactions. The Realm address will be auto-filled.
+                <div className="mt-5 space-y-5 animate-fadeIn">
+                  <p className="text-[10px] uppercase tracking-widest text-conclave-textMuted leading-relaxed">
+                    Deploys a new Realms DAO with a governance token.
+                    Requires 3 transactions. Auto-links generated Realm.
                   </p>
                   <div>
-                    <label className="block text-xs text-gray-400 mb-1">DAO name (optional)</label>
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-conclave-text/80 mb-2">DAO Name (Optional)</label>
                     <input
                       type="text"
                       value={createRealmName}
                       onChange={(e) => setCreateRealmName(e.target.value)}
                       placeholder={name.trim() ? `${name.trim()} Realm` : "My DAO Realm"}
-                      className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none text-sm"
+                      className="w-full rounded-lg border border-white/10 bg-black/50 px-4 py-3 text-white placeholder-conclave-textMuted focus:border-conclave-pink focus:outline-none text-sm transition-all focus:shadow-[0_0_15px_rgba(255,77,141,0.2)]"
                     />
                   </div>
                   {createRealmError && (
-                    <p className="text-red-400 text-xs">{createRealmError}</p>
+                    <p className="text-red-400 text-[10px] uppercase tracking-wider">{createRealmError}</p>
                   )}
                   {createRealmStatus && (
-                    <p className="text-conclave-accent text-xs">{createRealmStatus}</p>
+                    <p className="text-conclave-blue text-[10px] uppercase tracking-wider animate-pulse">{createRealmStatus}</p>
                   )}
                   <button
                     type="button"
                     onClick={handleCreateRealm}
                     disabled={createRealmLoading}
-                    className="btn-primary text-sm disabled:opacity-50 w-full"
+                    className="btn-primary w-full shadow-[0_0_20px_rgba(255,77,141,0.2)]"
                   >
-                    {createRealmLoading ? createRealmStatus || "Creating..." : "Create Realm on Devnet"}
+                    {createRealmLoading ? createRealmStatus || "Creating..." : "Deploy Realm"}
                   </button>
                 </div>
               )}
@@ -534,32 +541,32 @@ export default function CreateRoomPage() {
 
         {/* Custom token mode */}
         {mintMode === "custom" && (
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              Governance token mint
+          <div className="animate-fadeIn">
+            <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">
+              Governance Token Mint
             </label>
             <input
               type="text"
               value={governanceMintStr}
               onChange={(e) => setGovernanceMintStr(e.target.value)}
               placeholder="SPL token mint address"
-              className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none font-mono text-sm"
+              className="w-full rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-white placeholder-conclave-textMuted focus:border-conclave-yellow focus:shadow-[0_0_20px_rgba(255,200,0,0.2)] focus:outline-none font-mono text-sm transition-all"
             />
           </div>
         )}
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        {status && <p className="text-conclave-accent text-sm">{status}</p>}
+        {error && <p className="text-red-400 text-[10px] uppercase tracking-wider bg-red-500/10 border border-red-500/20 p-3 rounded-lg">{error}</p>}
+        {status && <p className="text-conclave-blue text-[10px] uppercase tracking-wider bg-conclave-blue/10 border border-conclave-blue/20 p-3 rounded-lg animate-pulse">{status}</p>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-4 pt-6 mt-4 border-t border-white/10">
           <button
             type="submit"
             disabled={loading || (mintMode === "realms" && !governanceMintStr)}
-            className="btn-primary disabled:opacity-50"
+            className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(237,224,212,0.1)]"
           >
-            {loading ? "Creating..." : "Create room"}
+            {loading ? "Creating Workspace..." : "Initialize Workspace"}
           </button>
-          <Link href="/rooms" className="btn-secondary">
+          <Link href="/rooms" className="btn-secondary !px-10 text-center">
             Cancel
           </Link>
         </div>

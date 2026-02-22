@@ -98,90 +98,101 @@ export default function CreateProposalPage() {
   const maxVotes = voteMode === 1 ? Math.floor(Math.sqrt(totalCredits)) : null;
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-10">
-      <Link href={`/rooms/${roomPda}`} className="text-conclave-accent text-sm mb-4 inline-block">← Room</Link>
-      <h1 className="text-2xl font-bold text-white mb-2">Create proposal</h1>
-      <p className="text-conclave-muted mb-6">Only room members can create proposals.</p>
+    <div className="max-w-2xl mx-auto px-6 py-16 relative">
+      {/* Background blobs */}
+      <div className="absolute top-0 -left-64 w-96 h-96 bg-conclave-pink/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0 pointer-events-none"></div>
+      <div className="absolute bottom-0 -right-64 w-96 h-96 bg-conclave-yellow/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000 z-0 pointer-events-none"></div>
 
-      <form onSubmit={handleSubmit} className="card space-y-4">
+      <div className="relative z-10 text-center mb-12">
+        <Link href={`/rooms/${roomPda}`} className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-conclave-textMuted hover:text-white transition-colors mb-8">
+          <span className="text-conclave-pink">&larr;</span> Back to Room
+        </Link>
+        <h1 className="text-4xl font-black text-conclave-text uppercase tracking-widest mb-4 inline-flex items-center gap-4">
+          <div className="w-3 h-3 bg-conclave-yellow rounded-full shadow-[0_0_15px_rgba(255,200,0,0.8)] animate-pulse"></div>
+          Create Proposal
+        </h1>
+        <p className="text-sm text-conclave-textMuted uppercase tracking-widest font-medium max-w-md mx-auto leading-relaxed">
+          Draft and submit a new proposal to the workspace.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="relative z-10 rounded-3xl border border-white/10 bg-conclave-card/60 p-8 sm:p-12 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] space-y-8 animate-fadeIn">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Title</label>
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">Title</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={MAX_TITLE}
-            placeholder="Proposal title"
-            className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none"
+            placeholder="What are we voting on?"
+            className="w-full rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-white placeholder-conclave-textMuted focus:border-conclave-yellow focus:shadow-[0_0_20px_rgba(255,200,0,0.2)] focus:outline-none transition-all font-medium text-lg"
           />
-          <p className="text-xs text-conclave-muted mt-1">{title.length}/{MAX_TITLE}</p>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mt-2 text-right">{title.length} / {MAX_TITLE}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">Description</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={MAX_DESC}
-            rows={4}
-            placeholder="Describe the proposal…"
-            className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none resize-none"
+            rows={5}
+            placeholder="Explain the context and impact of this proposal…"
+            className="w-full rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-white placeholder-conclave-textMuted focus:border-conclave-yellow focus:shadow-[0_0_20px_rgba(255,200,0,0.2)] focus:outline-none transition-all resize-none text-sm"
           />
-          <p className="text-xs text-conclave-muted mt-1">{description.length}/{MAX_DESC}</p>
+          <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mt-2 text-right">{description.length} / {MAX_DESC}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Voting deadline</label>
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">Voting Deadline</label>
           <input
             type="datetime-local"
             value={deadlineInput}
             onChange={(e) => setDeadlineInput(e.target.value)}
             min={minStr}
-            className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white focus:border-conclave-accent focus:outline-none"
+            className="w-full rounded-xl border border-white/10 bg-black/50 px-5 py-4 text-white focus:border-conclave-yellow focus:shadow-[0_0_20px_rgba(255,200,0,0.2)] focus:outline-none transition-all font-mono"
           />
         </div>
 
         {/* Vote mode selector */}
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Voting mode</label>
-          <div className="grid grid-cols-2 gap-2">
+          <label className="block text-xs font-bold uppercase tracking-widest text-conclave-text/80 mb-3">Voting Mechanism</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               type="button"
               onClick={() => setVoteMode(0)}
-              className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-left transition-all ${
-                voteMode === 0
-                  ? "border-conclave-accent bg-conclave-accent/10 text-conclave-accent"
-                  : "border-conclave-border bg-conclave-dark text-conclave-muted hover:border-conclave-accent/50"
-              }`}
+              className={`rounded-2xl border-2 p-5 text-left transition-all duration-300 group ${voteMode === 0
+                  ? "border-conclave-yellow bg-conclave-yellow/10"
+                  : "border-white/10 bg-black/50 hover:border-conclave-yellow/50"
+                }`}
             >
-              <div className="font-semibold mb-0.5">Standard</div>
-              <div className="text-xs opacity-75">Yes / No — 1 vote per member</div>
+              <div className={`font-black uppercase tracking-widest mb-2 transition-colors ${voteMode === 0 ? "text-conclave-yellow" : "text-white group-hover:text-conclave-yellow/70"}`}>Standard</div>
+              <div className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed">Yes / No — 1 vote per member</div>
             </button>
             <button
               type="button"
               onClick={() => setVoteMode(1)}
-              className={`rounded-xl border-2 px-4 py-3 text-sm font-medium text-left transition-all ${
-                voteMode === 1
-                  ? "border-purple-500 bg-purple-500/10 text-purple-400"
-                  : "border-conclave-border bg-conclave-dark text-conclave-muted hover:border-purple-500/50"
-              }`}
+              className={`rounded-2xl border-2 p-5 text-left transition-all duration-300 group ${voteMode === 1
+                  ? "border-purple-500 bg-purple-500/10"
+                  : "border-white/10 bg-black/50 hover:border-purple-500/50"
+                }`}
             >
-              <div className="font-semibold mb-0.5">Quadratic</div>
-              <div className="text-xs opacity-75">Voice credits — cost = votes²</div>
+              <div className={`font-black uppercase tracking-widest mb-2 transition-colors ${voteMode === 1 ? "text-purple-400" : "text-white group-hover:text-purple-400/70"}`}>Quadratic</div>
+              <div className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed">Voice credits — cost = votes²</div>
             </button>
           </div>
         </div>
 
         {/* Quadratic config */}
         {voteMode === 1 && (
-          <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-purple-400"></div>
-              <span className="text-sm font-medium text-purple-300">Quadratic voting settings</span>
+          <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-6 space-y-5 animate-fadeIn">
+            <div className="flex items-center gap-3 border-b border-purple-500/20 pb-4">
+              <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
+              <span className="text-[10px] uppercase font-bold tracking-widest text-purple-300">Quadratic Configuration</span>
             </div>
             <div>
-              <label className="block text-xs text-conclave-muted mb-1">
-                Voice credits per member
+              <label className="block text-[10px] uppercase font-bold tracking-widest text-conclave-text/80 mb-2">
+                Voice Credits Allocation
               </label>
               <input
                 type="number"
@@ -189,27 +200,27 @@ export default function CreateProposalPage() {
                 onChange={(e) => setTotalCredits(Math.max(1, parseInt(e.target.value) || 1))}
                 min={1}
                 max={10000}
-                className="w-full rounded-lg border border-purple-500/30 bg-conclave-dark px-3 py-2 text-white focus:border-purple-500 focus:outline-none"
+                className="w-full rounded-xl border border-purple-500/30 bg-black/50 px-5 py-4 text-white focus:border-purple-500 focus:shadow-[0_0_20px_rgba(168,85,247,0.2)] focus:outline-none transition-all font-mono"
               />
               {maxVotes !== null && (
-                <p className="text-xs text-conclave-muted mt-1">
-                  Max {maxVotes} votes per member (√{totalCredits} = {maxVotes})
+                <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mt-3 text-right">
+                  Max <span className="text-purple-400 text-sm">{maxVotes}</span> votes/member (√{totalCredits} = {maxVotes})
                 </p>
               )}
             </div>
-            <p className="text-xs text-conclave-muted">
-              Members allocate up to {totalCredits} credits. Casting k votes costs k² credits — this penalises extreme positions and gives minorities more power.
+            <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted leading-relaxed">
+              Allocating <span className="text-white">{totalCredits}</span> credits. Cost of <span className="italic text-purple-400">k</span> votes is <span className="italic text-purple-400">k²</span> credits. Penalizes extreme positions.
             </p>
           </div>
         )}
 
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+        {error && <p className="text-red-400 text-[10px] uppercase font-bold tracking-widest bg-red-500/10 border border-red-500/20 p-4 rounded-xl">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={loading} className="btn-primary disabled:opacity-50">
-            {loading ? "Creating…" : "Create proposal"}
+        <div className="flex flex-col sm:flex-row gap-4 pt-8 mt-4 border-t border-white/10">
+          <button type="submit" disabled={loading} className="btn-primary flex-1 disabled:opacity-50 shadow-[0_0_30px_rgba(255,200,0,0.15)] focus:ring focus:ring-conclave-yellow/50">
+            {loading ? "Submitting…" : "Publish Proposal"}
           </button>
-          <Link href={`/rooms/${roomPda}`} className="btn-secondary">Cancel</Link>
+          <Link href={`/rooms/${roomPda}`} className="btn-secondary !px-10 text-center">Cancel</Link>
         </div>
       </form>
     </div>

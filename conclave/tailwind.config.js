@@ -8,7 +8,7 @@ module.exports = {
       fontFamily: {
         sans: ["Outfit", "var(--font-geist-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "monospace"],
-        heading: ["Outfit", "var(--font-geist-sans)", "system-ui", "sans-serif"], // Using sans for now, but distinct class
+        heading: ["Outfit", "var(--font-geist-sans)", "system-ui", "sans-serif"],
       },
       colors: {
         conclave: {
@@ -25,6 +25,34 @@ module.exports = {
       },
       backgroundImage: {
         'grid-pattern': "linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px)",
+      },
+      animation: {
+        'spin-slow': 'spin 8s linear infinite',
+        'float': 'float 6s ease-in-out infinite',
+        'float-delayed': 'float 6s ease-in-out 3s infinite',
+        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'blob': 'blob 7s infinite',
+        'fadeIn': 'fadeIn 0.5s ease-out forwards',
+      },
+      keyframes: {
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-20px)' },
+        },
+        'pulse-glow': {
+          '0%, 100%': { opacity: 1, filter: 'drop-shadow(0 0 10px rgba(255, 77, 141, 0.5))' },
+          '50%': { opacity: .5, filter: 'drop-shadow(0 0 20px rgba(255, 77, 141, 0.8))' },
+        },
+        blob: {
+          '0%': { transform: 'translate(0px, 0px) scale(1)' },
+          '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+          '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+          '100%': { transform: 'translate(0px, 0px) scale(1)' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
       },
     },
   },

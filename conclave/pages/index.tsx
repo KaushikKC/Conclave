@@ -6,7 +6,12 @@ export default function HomePage() {
   const { connected } = useWallet();
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center overflow-auto pb-10 sm:pb-20 pt-10 sm:pt-20">
+    <div className="relative min-h-screen flex flex-col items-center overflow-hidden pb-10 sm:pb-20 pt-10 sm:pt-20">
+      {/* Background Blobs */}
+      <div className="absolute top-0 -left-64 w-96 h-96 bg-conclave-pink/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0"></div>
+      <div className="absolute top-0 -right-64 w-96 h-96 bg-conclave-blue/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-2000 z-0"></div>
+      <div className="absolute -bottom-64 left-1/2 transform -translate-x-1/2 w-96 h-96 bg-conclave-yellow/20 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000 z-0"></div>
+
       {/* Hero Section Container */}
       <section className="relative w-full max-w-5xl mx-auto px-4 sm:px-6 flex flex-col items-center text-center z-10 py-10 sm:py-20">
         {/* Pill Badge */}
@@ -18,26 +23,26 @@ export default function HomePage() {
         </div>
 
         {/* Floating Elements — hidden on small screens to avoid overflow */}
-        <div className="hidden md:flex absolute top-10 left-0 lg:-left-20 w-24 h-24 md:w-32 md:h-32 bg-[#9D4EDD] rounded-xl transform -rotate-12 shadow-2xl z-20 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-0 transition-all duration-500 cursor-pointer group">
+        <div className="hidden md:flex absolute top-10 left-0 lg:-left-20 w-24 h-24 md:w-32 md:h-32 bg-[#9D4EDD] rounded-xl transform -rotate-12 shadow-2xl z-20 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-0 transition-all duration-500 cursor-pointer group animate-float">
           <div className="w-20 h-20 rounded-full border-4 border-black/20 flex items-center justify-center group-hover:animate-spin-slow">
             <div className="w-6 h-6 bg-black/20 rounded-full"></div>
           </div>
         </div>
 
-        <div className="hidden md:flex absolute top-20 right-0 lg:-right-24 w-28 h-28 md:w-36 md:h-36 bg-conclave-text rounded-sm transform rotate-6 shadow-2xl z-20 flex-col items-center justify-center border border-white/10 hover:scale-110 hover:-rotate-3 transition-all duration-500 cursor-pointer">
+        <div className="hidden md:flex absolute top-20 right-0 lg:-right-24 w-28 h-28 md:w-36 md:h-36 bg-conclave-text rounded-sm transform rotate-6 shadow-2xl z-20 flex-col items-center justify-center border border-white/10 hover:scale-110 hover:-rotate-3 transition-all duration-500 cursor-pointer animate-float-delayed">
           <span className="text-conclave-dark font-black text-xl">NO</span>
           <span className="text-conclave-dark font-black text-3xl tracking-tighter">
             BIAS
           </span>
         </div>
 
-        <div className="hidden lg:flex absolute bottom-20 left-4 lg:-left-32 w-24 h-24 md:w-40 md:h-32 bg-conclave-card rounded-xl transform rotate-[-6deg] shadow-2xl z-0 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-3 transition-all duration-500 cursor-pointer">
+        <div className="hidden lg:flex absolute bottom-20 left-4 lg:-left-32 w-24 h-24 md:w-40 md:h-32 bg-conclave-card rounded-xl transform rotate-[-6deg] shadow-2xl z-0 items-center justify-center border border-white/10 hover:scale-110 hover:rotate-3 transition-all duration-500 cursor-pointer animate-pulse-glow">
           <span className="text-conclave-green font-black text-3xl tracking-widest rotate-[-5deg] border-2 border-conclave-green px-2 py-1 rounded">
             ANON
           </span>
         </div>
 
-        <div className="hidden lg:flex absolute bottom-40 right-4 lg:-right-16 w-20 h-20 md:w-24 md:h-24 bg-conclave-blue rounded-[2rem] transform rotate-12 shadow-2xl z-0 items-center justify-center opacity-80 hover:scale-110 hover:rotate-45 transition-all duration-500 cursor-pointer">
+        <div className="hidden lg:flex absolute bottom-40 right-4 lg:-right-16 w-20 h-20 md:w-24 md:h-24 bg-conclave-blue rounded-[2rem] transform rotate-12 shadow-2xl z-0 items-center justify-center opacity-80 hover:scale-110 hover:rotate-45 transition-all duration-500 cursor-pointer animate-float-delayed">
           <div className="w-full h-full bg-[linear-gradient(45deg,transparent_25%,rgba(0,0,0,0.2)_25%,rgba(0,0,0,0.2)_50%,transparent_50%,transparent_75%,rgba(0,0,0,0.2)_75%,rgba(0,0,0,0.2)_100%)] bg-[length:10px_10px]"></div>
         </div>
 
@@ -89,8 +94,8 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
-          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
-            <div className="text-3xl mb-4">{">"}</div>
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(255,255,255,0.05)] group">
+            <div className="text-3xl mb-4 transform transition-transform group-hover:scale-110 group-hover:text-conclave-pink">{">"}</div>
             <h3 className="text-lg font-bold text-conclave-text mb-3">Eliminate groupthink</h3>
             <p className="text-sm text-conclave-textMuted leading-relaxed">
               When votes are visible, members follow the majority. Commit-reveal ensures
@@ -98,8 +103,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
-            <div className="text-3xl mb-4">{"#"}</div>
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(255,255,255,0.05)] group">
+            <div className="text-3xl mb-4 transform transition-transform group-hover:scale-110 group-hover:text-conclave-yellow">{"#"}</div>
             <h3 className="text-lg font-bold text-conclave-text mb-3">Protect whistleblowers</h3>
             <p className="text-sm text-conclave-textMuted leading-relaxed">
               Anonymous aliases per room mean your identity is never linked across
@@ -107,8 +112,8 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all">
-            <div className="text-3xl mb-4">{"!"}</div>
+          <div className="rounded-xl border border-white/10 p-8 bg-white/[0.02] hover:bg-white/5 transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_10px_30px_rgba(255,255,255,0.05)] group">
+            <div className="text-3xl mb-4 transform transition-transform group-hover:scale-110 group-hover:text-conclave-blue">{"!"}</div>
             <h3 className="text-lg font-bold text-conclave-text mb-3">Extends Realms</h3>
             <p className="text-sm text-conclave-textMuted leading-relaxed">
               Extends your Realms DAO with private voting and encrypted discussion.
@@ -130,11 +135,11 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4">
           {/* Anonymous Voting Demo */}
-          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden">
+          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden transform transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(0,201,167,0.15)] group">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60 transition-colors group-hover:bg-red-500"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60 transition-colors group-hover:bg-yellow-500"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60 transition-colors group-hover:bg-green-500"></div>
               <span className="text-[10px] text-conclave-textMuted ml-2 uppercase tracking-widest">Anonymous Voting</span>
             </div>
             <div className="p-5 space-y-4">
@@ -150,7 +155,7 @@ export default function HomePage() {
                   <span className="text-red-400 font-medium">No 27%</span>
                 </div>
                 <div className="h-2.5 bg-conclave-dark rounded-full overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-1000" style={{width: "73%"}}></div>
+                  <div className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-1000" style={{ width: "73%" }}></div>
                 </div>
                 <p className="text-[10px] text-conclave-textMuted">11 votes cast &middot; 3 pending reveal</p>
               </div>
@@ -176,11 +181,11 @@ export default function HomePage() {
           </div>
 
           {/* Encrypted Chat Demo */}
-          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden">
+          <div className="rounded-2xl border border-white/10 bg-conclave-card/80 overflow-hidden transform transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,77,141,0.15)] group">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/[0.02]">
-              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60"></div>
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/60 transition-colors group-hover:bg-red-500"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60 transition-colors group-hover:bg-yellow-500"></div>
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/60 transition-colors group-hover:bg-green-500"></div>
               <span className="text-[10px] text-conclave-textMuted ml-2 uppercase tracking-widest">Encrypted Chat</span>
             </div>
             <div className="p-5 space-y-3">

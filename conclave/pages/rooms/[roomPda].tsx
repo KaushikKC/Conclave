@@ -167,7 +167,7 @@ export default function RoomDetailPage() {
             return;
           }
         }
-      } catch {}
+      } catch { }
 
       // Fallback: check member PDA on-chain directly
       if (programReadOnly && !cancelled) {
@@ -212,7 +212,7 @@ export default function RoomDetailPage() {
           if (!cancelled) {
             setRealmMemberVerified(
               membership !== null &&
-                membership.governingTokenDepositAmount.gtn(0),
+              membership.governingTokenDepositAmount.gtn(0),
             );
           }
         }
@@ -246,7 +246,7 @@ export default function RoomDetailPage() {
           );
           localKey = decoded;
           if (!cancelled) setGroupKey(decoded);
-        } catch {}
+        } catch { }
       }
 
       // Try localStorage first
@@ -258,7 +258,7 @@ export default function RoomDetailPage() {
             localKey = new Uint8Array(arr);
             if (!cancelled) setGroupKey(localKey);
           }
-        } catch {}
+        } catch { }
       }
 
       // Fetch from indexer
@@ -274,7 +274,7 @@ export default function RoomDetailPage() {
           );
           if (!cancelled) setGroupKey(arr);
         }
-      } catch {}
+      } catch { }
 
       // Auto-republish: if we have the key locally but indexer doesn't,
       // and the current wallet is the room authority, push it in the background
@@ -519,72 +519,89 @@ export default function RoomDetailPage() {
 
   if (!isMember) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-10">
-        <Link
-          href="/rooms"
-          className="text-conclave-accent text-sm mb-4 inline-block"
-        >
-          ← Rooms
-        </Link>
-        <div className="card">
-          <h1 className="text-2xl font-bold text-white mb-2">{room.name}</h1>
-          {room.realmAddress && realmName && (
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
-                Realms DAO
-              </span>
-              <a
-                href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-conclave-accent hover:underline"
-              >
-                {realmName} &rarr;
-              </a>
-            </div>
-          )}
-          <p className="text-conclave-muted text-sm mb-4">
-            {room.memberCount} members · {room.proposalCount} proposals
-          </p>
-          <p className="text-xs text-conclave-muted font-mono mb-4 break-all">
-            Governance mint: {room.governanceMint}
-          </p>
+      <div className="max-w-2xl mx-auto px-6 py-16 relative">
+        {/* Background blobs */}
+        <div className="absolute top-0 -left-64 w-96 h-96 bg-conclave-pink/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0 pointer-events-none"></div>
+        <div className="absolute -bottom-64 -right-64 w-96 h-96 bg-conclave-blue/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob animation-delay-4000 z-0 pointer-events-none"></div>
 
-          {room.realmAddress && realmName ? (
-            <div className="mb-4">
-              <p className="text-sm text-gray-300 mb-2">
-                This room requires membership in{" "}
-                <span className="text-white font-medium">{realmName}</span> DAO.
-              </p>
-              {realmMemberVerified === true && (
-                <p className="text-xs text-green-400 flex items-center gap-1 mb-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-green-400"></span>
-                  Verified Realms DAO member
-                </p>
-              )}
-              {realmMemberVerified === false && (
-                <p className="text-xs text-yellow-400 flex items-center gap-1 mb-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
-                  Not a member of this Realm — you still need the governance
-                  token to join
-                </p>
-              )}
+        <div className="relative z-10">
+          <Link
+            href="/rooms"
+            className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-conclave-textMuted hover:text-white transition-colors mb-8"
+          >
+            <span className="text-conclave-pink">&larr;</span> Back to Rooms
+          </Link>
+          <div className="rounded-3xl border border-white/10 bg-conclave-card/60 p-8 sm:p-12 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+            <h1 className="text-3xl md:text-4xl font-black text-conclave-text uppercase tracking-widest mb-4 flex items-center gap-3">
+              <div className="w-2.5 h-2.5 bg-conclave-pink rounded-full shadow-[0_0_15px_rgba(255,77,141,0.8)] animate-pulse"></div>
+              {room.name}
+            </h1>
+            {room.realmAddress && realmName && (
+              <div className="flex items-center gap-2 mb-6">
+                <span className="text-[10px] px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold uppercase tracking-widest">
+                  Realms DAO
+                </span>
+                <a
+                  href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] uppercase font-bold tracking-widest text-conclave-blue hover:text-white hover:underline transition-colors"
+                >
+                  {realmName} &nearr;
+                </a>
+              </div>
+            )}
+
+            <div className="flex gap-6 mb-8 pb-8 border-b border-white/5">
+              <div>
+                <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-1">Members</p>
+                <p className="text-lg font-mono text-white">{room.memberCount}</p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-1">Proposals</p>
+                <p className="text-lg font-mono text-white">{room.proposalCount}</p>
+              </div>
             </div>
-          ) : (
-            <p className="text-sm text-gray-300 mb-4">
-              You need at least 1 governance token to join.
+
+            <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-2">Governance Mint</p>
+            <p className="text-xs text-white/80 font-mono mb-8 p-3 bg-black/50 rounded-lg border border-white/5 break-all">
+              {room.governanceMint}
             </p>
-          )}
-          {joinError && (
-            <p className="text-red-400 text-sm mb-3">{joinError}</p>
-          )}
-          <div className="flex gap-3">
+
+            {room.realmAddress && realmName ? (
+              <div className="mb-8 p-4 rounded-xl border border-conclave-blue/20 bg-conclave-blue/5">
+                <p className="text-xs text-conclave-text/80 mb-3 leading-relaxed">
+                  This room requires membership in the <span className="text-white font-bold">{realmName}</span> DAO.
+                </p>
+                {realmMemberVerified === true && (
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-green-400 flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                    Verified Realms DAO member
+                  </p>
+                )}
+                {realmMemberVerified === false && (
+                  <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-yellow flex items-center gap-2">
+                    <span className="inline-block w-2 h-2 rounded-full bg-conclave-yellow"></span>
+                    Not a member of this Realm
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted mb-6 p-4 rounded-xl border border-white/5 bg-black/30">
+                Requires at least 1 governance token to join.
+              </p>
+            )}
+
+            {joinError && (
+              <p className="text-red-400 text-[10px] uppercase tracking-wider mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">{joinError}</p>
+            )}
+
             <button
               onClick={handleJoin}
-              disabled={joinLoading}
-              className="btn-primary"
+              disabled={joinLoading || (room.realmAddress ? realmMemberVerified === false : false)}
+              className="btn-primary w-full shadow-[0_0_30px_rgba(255,77,141,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {joinLoading ? "Joining…" : "Join room"}
+              {joinLoading ? "Decrypting Key…" : "Join Workspace"}
             </button>
           </div>
         </div>
@@ -622,129 +639,150 @@ export default function RoomDetailPage() {
     }
   };
 
+  // Tab active colors match landing "How it works": Create=pink, Discuss=yellow, Vote=green, Reveal=blue
+  const tabActiveStyles: Record<typeof tab, string> = {
+    chat: "bg-gradient-to-br from-conclave-yellow/20 to-conclave-yellow/5 border-conclave-yellow/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(255,200,0,0.08)]",
+    proposals: "bg-gradient-to-br from-conclave-green/20 to-conclave-green/5 border-conclave-green/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(0,201,167,0.08)]",
+    members: "bg-gradient-to-br from-conclave-pink/20 to-conclave-pink/5 border-conclave-pink/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(255,77,141,0.08)]",
+    treasury: "bg-gradient-to-br from-conclave-blue/20 to-conclave-blue/5 border-conclave-blue/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(0,184,241,0.08)]",
+    zk: "bg-gradient-to-br from-conclave-pink/20 to-conclave-pink/5 border-conclave-pink/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(255,77,141,0.08)]",
+    realms: "bg-gradient-to-br from-conclave-blue/20 to-conclave-blue/5 border-conclave-blue/30 border-b-0 text-conclave-text shadow-[0_-5px_20px_rgba(0,184,241,0.08)]",
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <Link
-        href="/rooms"
-        className="text-conclave-accent text-sm mb-4 inline-block"
-      >
-        ← Rooms
-      </Link>
-      <div className="flex items-center gap-4 mb-4">
-        <h1 className="text-2xl font-bold text-white">{room.name}</h1>
-        {room.realmAddress && (
-          <a
-            href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium hover:bg-purple-500/30 transition"
-          >
-            {realmName ? `${realmName}` : "Realms DAO"} &rarr;
-          </a>
-        )}
-        {groupKey && (
-          <button
-            onClick={copyInviteLink}
-            className="text-xs px-3 py-1 rounded-full border border-conclave-border text-conclave-muted hover:text-conclave-accent hover:border-conclave-accent transition"
-          >
-            {inviteCopied ? "Copied!" : "Copy invite link"}
-          </button>
-        )}
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 relative">
+      {/* Background blobs */}
+      <div className="absolute top-20 -left-64 w-96 h-96 bg-conclave-pink/10 rounded-full mix-blend-screen filter blur-[100px] animate-blob z-0 pointer-events-none"></div>
+
+      <div className="relative z-10 mb-8 border-b border-white/10 pb-6">
+        <Link
+          href="/rooms"
+          className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-conclave-textMuted hover:text-white transition-colors mb-6"
+        >
+          <span className="text-conclave-pink">&larr;</span> Rooms
+        </Link>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-black text-white uppercase tracking-widest flex items-center gap-3">
+              <div className="w-3 h-3 bg-conclave-blue rounded-full shadow-[0_0_15px_rgba(0,184,241,0.8)] animate-pulse"></div>
+              {room.name}
+            </h1>
+            {room.realmAddress && (
+              <a
+                href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold uppercase tracking-widest hover:bg-purple-500/20 transition-colors"
+              >
+                {realmName ? `${realmName}` : "Realms DAO"} &nearr;
+              </a>
+            )}
+          </div>
+
+          {groupKey && (
+            <button
+              onClick={copyInviteLink}
+              className="btn-secondary !px-6 !py-2.5 shadow-[0_0_20px_rgba(237,224,212,0.1)] transition-all relative overflow-hidden group"
+            >
+              <span className="relative z-10">{inviteCopied ? "Link Copied!" : "Share Link"}</span>
+              {inviteCopied && <div className="absolute inset-0 bg-conclave-green/20 z-0"></div>}
+            </button>
+          )}
+        </div>
       </div>
 
-      {isAuthority && groupKey && (
-        <div className="mb-4 p-3 rounded-lg bg-conclave-card border border-conclave-border text-sm text-conclave-muted">
-          {publishKeyDone ? (
-            <span className="text-green-400">
-              Room key saved to server. Others can join.
-            </span>
-          ) : (
-            <>
-              The room key is usually saved automatically when you create a room
-              (if the indexer is running). If someone couldn’t join, start the
-              indexer (
-              <code className="text-xs bg-conclave-dark px-1 rounded">
-                cd indexer && npm run dev
-              </code>
-              ) and{" "}
-              <button
-                type="button"
-                onClick={handlePublishKey}
-                disabled={publishKeyLoading}
-                className="text-conclave-accent hover:underline disabled:opacity-50"
-              >
-                {publishKeyLoading ? "Publishing…" : "save the key now"}
-              </button>
-              .
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Session key banner */}
-      {isMember && (
-        <div className="mb-4">
-          {sessionKeypair ? (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs">
-              <span className="text-green-400">
-                Gas-free chat active — messages send without wallet popups
+      <div className="relative z-10">
+        {isAuthority && groupKey && (
+          <div className="mb-6 p-4 rounded-xl bg-black/40 border border-conclave-yellow/20 text-xs font-medium text-conclave-textMuted leading-relaxed">
+            {publishKeyDone ? (
+              <span className="text-green-400 flex items-center gap-2 uppercase tracking-widest text-[10px]">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                Workspace key synchronized to network.
               </span>
-              <button
-                onClick={handleClearSession}
-                className="text-conclave-muted hover:text-red-400 transition ml-4"
-              >
-                Revoke
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-conclave-card border border-conclave-border text-xs">
-              <span className="text-conclave-muted">
-                Enable gas-free chat — one wallet approval, 0.1 SOL deposited
-                for message fees
-              </span>
-              <button
-                onClick={handleCreateSession}
-                disabled={sessionLoading}
-                className="ml-4 text-conclave-accent hover:underline disabled:opacity-50"
-              >
-                {sessionLoading ? "Creating…" : "Enable ⚡"}
-              </button>
-            </div>
-          )}
-          {sessionError && (
-            <p className="text-red-400 text-xs mt-1">{sessionError}</p>
-          )}
-        </div>
-      )}
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <span>
+                  To allow others to join, ensure the indexer is running and save the workspace key.
+                </span>
+                <button
+                  type="button"
+                  onClick={handlePublishKey}
+                  disabled={publishKeyLoading}
+                  className="btn-primary !py-2 !px-4 !text-[10px] whitespace-nowrap disabled:opacity-50"
+                >
+                  {publishKeyLoading ? "Syncing…" : "Sync Room Key"}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
-      <div className="flex gap-2 border-b border-conclave-border mb-6 overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
-        {(
-          [
-            "chat",
-            "proposals",
-            "members",
-            "treasury",
-            "zk",
-            ...(room.realmAddress ? ["realms" as const] : []),
-          ] as const
-        ).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-              tab === t
-                ? "bg-conclave-card border border-conclave-border border-b-0 text-conclave-accent"
-                : "text-conclave-muted hover:text-white"
-            }`}
-          >
-            {t === "chat" && "Chat"}
-            {t === "proposals" && "Proposals"}
-            {t === "members" && "Members"}
-            {t === "treasury" && "Treasury"}
-            {t === "zk" && "ZK Proof"}
-            {t === "realms" && "Realms DAO"}
-          </button>
-        ))}
+        {/* Session key banner */}
+        {isMember && (
+          <div className="mb-8">
+            {sessionKeypair ? (
+              <div className="flex items-center justify-between px-5 py-3 rounded-xl bg-green-500/5 border border-green-500/20 text-xs">
+                <span className="text-green-400 font-bold uppercase tracking-widest flex items-center gap-2 text-[10px]">
+                  <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                  Gas-Free Mode Active
+                </span>
+                <button
+                  onClick={handleClearSession}
+                  className="text-[10px] uppercase font-bold tracking-widest text-conclave-textMuted hover:text-red-400 transition ml-4"
+                >
+                  Revoke Session
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between px-5 py-4 rounded-xl bg-black/40 border border-white/10 text-xs gap-4">
+                <span className="text-conclave-textMuted leading-relaxed">
+                  <span className="text-white font-bold">Enable Session Key</span> — sign once, chat without wallet popups.
+                </span>
+                <button
+                  onClick={handleCreateSession}
+                  disabled={sessionLoading}
+                  className="btn-primary !py-2 !px-6 !text-[10px] shadow-[0_0_15px_rgba(255,77,141,0.2)] disabled:opacity-50 whitespace-nowrap"
+                >
+                  {sessionLoading ? "Initializing…" : "Enable Session ⚡"}
+                </button>
+              </div>
+            )}
+            {sessionError && (
+              <p className="text-red-400 text-[10px] uppercase tracking-widest mt-2 px-2">{sessionError}</p>
+            )}
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="flex gap-2 sm:gap-4 mb-8 overflow-x-auto pb-2 scrollbar-hide border-b border-white/5">
+          {(
+            [
+              "chat",
+              "proposals",
+              "members",
+              "treasury",
+              "zk",
+              ...(room.realmAddress ? ["realms" as const] : []),
+            ] as const
+          ).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-5 py-3 text-[10px] sm:text-xs font-bold uppercase tracking-widest rounded-t-xl transition-all whitespace-nowrap border ${tab === t
+                  ? tabActiveStyles[t]
+                  : "text-conclave-textMuted hover:text-white hover:bg-white/5 border-transparent"
+                }`}
+            >
+              {t === "chat" && "Encrypted Chat"}
+              {t === "proposals" && "Proposals"}
+              {t === "members" && "Roster"}
+              {t === "treasury" && "Treasury"}
+              {t === "zk" && "Zero-Knowledge"}
+              {t === "realms" && "Realms Setup"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {tab === "chat" && (
@@ -1054,13 +1092,10 @@ function ProposalsList({
                         </h3>
                       </div>
                       <span
-                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
-                          badge.bgColor
-                        } ${badge.color} border ${
-                          badge.borderColor
-                        } font-medium ${
-                          badge.label === "Voting" ? "animate-pulse" : ""
-                        }`}
+                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${badge.bgColor
+                          } ${badge.color} border ${badge.borderColor
+                          } font-medium ${badge.label === "Voting" ? "animate-pulse" : ""
+                          }`}
                       >
                         {badge.label}
                       </span>
@@ -1157,13 +1192,10 @@ function ProposalsList({
                         {p.title}
                       </h3>
                       <span
-                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
-                          phase.bgColor
-                        } ${phase.color} border ${
-                          phase.borderColor
-                        } font-medium ${
-                          phase.label === "Voting" ? "animate-pulse" : ""
-                        }`}
+                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${phase.bgColor
+                          } ${phase.color} border ${phase.borderColor
+                          } font-medium ${phase.label === "Voting" ? "animate-pulse" : ""
+                          }`}
                       >
                         {phase.label}
                       </span>
@@ -1213,19 +1245,18 @@ function ProposalsList({
                       )}
                       {p.isFinalized && totalVotes > 0 && (
                         <span
-                          className={`font-bold ${
-                            p.voteYesCount > p.voteNoCount
+                          className={`font-bold ${p.voteYesCount > p.voteNoCount
                               ? "text-green-400"
                               : p.voteNoCount > p.voteYesCount
-                              ? "text-red-400"
-                              : "text-yellow-400"
-                          }`}
+                                ? "text-red-400"
+                                : "text-yellow-400"
+                            }`}
                         >
                           {p.voteYesCount > p.voteNoCount
                             ? "PASSED"
                             : p.voteNoCount > p.voteYesCount
-                            ? "REJECTED"
-                            : "TIED"}
+                              ? "REJECTED"
+                              : "TIED"}
                         </span>
                       )}
                     </div>
@@ -1350,9 +1381,8 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
 
       {status && (
         <p
-          className={`text-sm mt-2 ${
-            status.type === "success" ? "text-green-400" : "text-red-400"
-          }`}
+          className={`text-sm mt-2 ${status.type === "success" ? "text-green-400" : "text-red-400"
+            }`}
         >
           {status.message}
         </p>
