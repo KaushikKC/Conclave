@@ -106,6 +106,14 @@ db.exec(`
     room TEXT PRIMARY KEY,
     realm_address TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS zk_identities (
+    room_pda TEXT NOT NULL,
+    commitment TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (room_pda, commitment)
+  );
+  CREATE INDEX IF NOT EXISTS idx_zk_identities_room ON zk_identities(room_pda);
 `);
 
 // Migration: add realm_address column to existing DBs
@@ -745,6 +753,43 @@ app.get("/health", (_req, res) => {
     rooms: roomCount.count,
     rpc: RPC_URL,
     program: PROGRAM_ID.toBase58(),
+  });
+});
+
+// --- ZK Identity Endpoints ---
+
+/** Register an anonymous identity commitment for a room */
+app.post("/zk/identity", (req, res) => {
+  const { roomPda, commitment } = req.body;
+  if (!roomPda || !commitment) {
+    return res.status(400).json({ error: "Missing roomPda or commitment" });
+  }
+  // Sanity check: commitment should look like a large decimal integer
+  if (!/^\d+$/.test(commitment)) {
+    return res.status(400).json({ error: "Invalid commitment format" });
+  }
+  try {
+    db.prepare(
+      "INSERT OR IGNORE INTO zk_identities (room_pda, commitment, created_at) VALUES (?, ?, ?)"
+    ).run(roomPda, commitment, Math.floor(Date.now() / 1000));
+    res.json({ ok: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/** Get all identity commitments for a room (the Merkle group) */
+app.get("/zk/group/:roomPda", (req, res) => {
+  const { roomPda } = req.params;
+  const rows = db
+    .prepare(
+      "SELECT commitment FROM zk_identities WHERE room_pda = ? ORDER BY created_at ASC"
+    )
+    .all(roomPda) as Array<{ commitment: string }>;
+  res.json({
+    roomPda,
+    commitments: rows.map((r) => r.commitment),
+    size: rows.length,
   });
 });
 

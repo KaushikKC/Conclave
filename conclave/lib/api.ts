@@ -300,6 +300,35 @@ export async function fetchReputationBatch(
   }
 }
 
+// --- ZK Identity ---
+
+/** Register an anonymous Semaphore identity commitment for a room */
+export async function postZKIdentity(
+  roomPda: string,
+  commitment: string,
+): Promise<void> {
+  const res = await fetch(`${BASE_URL}/zk/identity`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomPda, commitment }),
+  });
+  if (!res.ok) throw new Error(`Failed to register ZK identity: ${res.status}`);
+}
+
+/** Fetch all identity commitments for a room's ZK group */
+export async function fetchZKGroup(
+  roomPda: string,
+): Promise<string[]> {
+  try {
+    const data = await fetchJSON<{ commitments: string[]; size: number }>(
+      `/zk/group/${roomPda}`,
+    );
+    return data.commitments;
+  } catch {
+    return [];
+  }
+}
+
 export async function postGroupKeyWithRetry(
   roomAddress: string,
   groupKeyBase64: string,

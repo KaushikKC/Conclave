@@ -20,6 +20,11 @@ import ChatRoom from "../../components/ChatRoom";
 import MemberList from "../../components/MemberList";
 import RealmsGovernance from "../../components/RealmsGovernance";
 import TreasuryCard from "../../components/TreasuryCard";
+import dynamic from "next/dynamic";
+const ZKMembershipCard = dynamic(
+  () => import("../../components/ZKMembershipCard"),
+  { ssr: false },
+);
 import {
   useSessionKey,
   generateAndStoreSessionKeypair,
@@ -46,7 +51,7 @@ import {
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
-type Tab = "chat" | "proposals" | "members" | "treasury" | "realms";
+type Tab = "chat" | "proposals" | "members" | "treasury" | "realms" | "zk";
 
 interface RoomData {
   name: string;
@@ -719,6 +724,7 @@ export default function RoomDetailPage() {
             "proposals",
             "members",
             "treasury",
+            "zk",
             ...(room.realmAddress ? ["realms" as const] : []),
           ] as const
         ).map((t) => (
@@ -735,6 +741,7 @@ export default function RoomDetailPage() {
             {t === "proposals" && "Proposals"}
             {t === "members" && "Members"}
             {t === "treasury" && "Treasury"}
+            {t === "zk" && "ZK Proof"}
             {t === "realms" && "Realms DAO"}
           </button>
         ))}
@@ -780,6 +787,18 @@ export default function RoomDetailPage() {
       {tab === "treasury" && (
         <div className="card">
           <TreasuryCard roomPda={roomPda} roomAuthority={room.authority} />
+        </div>
+      )}
+
+      {tab === "zk" && (
+        <div className="card">
+          <div className="flex items-center gap-3 mb-4">
+            <h2 className="font-semibold text-white">ZK Proof of Membership</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">
+              Groth16 · Semaphore
+            </span>
+          </div>
+          <ZKMembershipCard roomPda={roomPda} isMember={isMember} />
         </div>
       )}
 

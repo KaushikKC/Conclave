@@ -2,8 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: [],
-  webpack: (config) => {
-    config.resolve.fallback = { fs: false, path: false, crypto: false };
+  webpack: (config, { isServer }) => {
+    config.resolve.fallback = {
+      fs: false,
+      path: false,
+      crypto: false,
+      // snarkjs uses worker_threads in Node.js; not needed in browser
+      ...(!isServer && { worker_threads: false }),
+    };
     return config;
   },
   async headers() {
