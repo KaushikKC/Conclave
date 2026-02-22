@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Keypair,
+  Transaction,
+} from "@solana/web3.js";
 import * as anchor from "@coral-xyz/anchor";
 import { useConclaveProgram } from "../hooks/useConclaveProgram";
-import { getMessagePda } from "../lib/conclave";
+import { getMessagePda, getMemberPda, getSessionPda } from "../lib/conclave";
 import { decryptMessage, encryptMessage } from "../app/sdk/crypto";
-import { fetchRoomMessages, postMessage, deleteMessageFromIndexer, fetchReputationBatch, ApiReputation } from "../lib/api";
+import {
+  fetchRoomMessages,
+  postMessage,
+  deleteMessageFromIndexer,
+  fetchReputationBatch,
+  ApiReputation,
+} from "../lib/api";
 import { getAnonAlias } from "../lib/anon";
 
 const MAX_CIPHERTEXT_BYTES = 1024;
@@ -31,10 +42,16 @@ interface DecryptedMessage {
 interface ChatRoomProps {
   roomPda: PublicKey;
   groupKey: Uint8Array | null;
+  /** Optional session keypair for gasless sending (no wallet popup). */
+  sessionKeypair?: Keypair | null;
 }
 
-export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
-  const { program, wallet } = useConclaveProgram();
+export default function ChatRoom({
+  roomPda,
+  groupKey,
+  sessionKeypair,
+}: ChatRoomProps) {
+  const { program, wallet, connection } = useConclaveProgram();
   const [messages, setMessages] = useState<DecryptedMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -56,7 +73,10 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
 
   // Update "now" every second for countdown display
   useEffect(() => {
-    const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    const interval = setInterval(
+      () => setNow(Math.floor(Date.now() / 1000)),
+      1000,
+    );
     return () => clearInterval(interval);
   }, []);
 
@@ -144,7 +164,9 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
   useEffect(() => {
     const newWallets = messages
       .map((m) => m.sender)
-      .filter((w, i, arr) => arr.indexOf(w) === i && !repFetchedRef.current.has(w));
+      .filter(
+        (w, i, arr) => arr.indexOf(w) === i && !repFetchedRef.current.has(w),
+      );
     if (newWallets.length === 0) return;
     newWallets.forEach((w) => repFetchedRef.current.add(w));
     fetchReputationBatch(newWallets).then((batch) => {
@@ -167,7 +189,9 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
           ephemeralMapRef.current.delete(pda);
           deleteMessageFromIndexer(pda);
         }
-        setMessages((prev) => prev.filter((m) => !expired.includes(m.publicKey)));
+        setMessages((prev) =>
+          prev.filter((m) => !expired.includes(m.publicKey)),
+        );
       }
     }, EPHEMERAL_CHECK_MS);
     return () => clearInterval(interval);
@@ -190,9 +214,10 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     setError("");
     try {
       const timestamp = Math.floor(Date.now() / 1000);
+      const senderKey = wallet.publicKey;
       const messagePda = getMessagePda(
         roomPda,
-        wallet.publicKey,
+        senderKey,
         timestamp,
         program.programId,
       );
@@ -200,15 +225,49 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         typeof Buffer !== "undefined"
           ? Buffer.from(ciphertext)
           : new Uint8Array(ciphertext);
-      await program.methods
-        .sendMessage(ciphertextBuf, new anchor.BN(timestamp))
-        .accountsPartial({
-          sender: wallet.publicKey,
-          room: roomPda,
-          message: messagePda,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+
+      if (sessionKeypair) {
+        // ── Gasless path: session keypair signs, no wallet popup ─────────────
+        const sessionPda = getSessionPda(roomPda, senderKey, program.programId);
+        const memberPda = getMemberPda(roomPda, senderKey, program.programId);
+
+        const tx = await program.methods
+          .sendMessageWithSession(ciphertextBuf, new anchor.BN(timestamp))
+          .accountsPartial({
+            sessionKey: sessionKeypair.publicKey,
+            room: roomPda,
+            owner: senderKey,
+            session: sessionPda,
+            member: memberPda,
+            message: messagePda,
+            systemProgram: SystemProgram.programId,
+          })
+          .transaction();
+
+        tx.feePayer = sessionKeypair.publicKey;
+        const { blockhash, lastValidBlockHeight } =
+          await connection.getLatestBlockhash("confirmed");
+        tx.recentBlockhash = blockhash;
+        tx.lastValidBlockHeight = lastValidBlockHeight;
+        tx.sign(sessionKeypair);
+        const sig = await connection.sendRawTransaction(tx.serialize());
+        await connection.confirmTransaction(
+          { signature: sig, blockhash, lastValidBlockHeight },
+          "confirmed",
+        );
+      } else {
+        // ── Normal path: wallet signs ────────────────────────────────────────
+        await program.methods
+          .sendMessage(ciphertextBuf, new anchor.BN(timestamp))
+          .accountsPartial({
+            sender: senderKey,
+            room: roomPda,
+            message: messagePda,
+            systemProgram: SystemProgram.programId,
+          })
+          .rpc();
+      }
+
       setInput("");
 
       const expiresAt = ephemeral ? timestamp + ephemeralDuration : undefined;
@@ -217,7 +276,7 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
       }
 
       pendingSentRef.current = {
-        sender: wallet.publicKey!.toBase58(),
+        sender: senderKey.toBase58(),
         timestamp,
         text: plaintext,
       };
@@ -225,18 +284,17 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         ...prev,
         {
           publicKey: messagePda.toBase58(),
-          sender: wallet.publicKey!.toBase58(),
+          sender: senderKey.toBase58(),
           text: plaintext,
           timestamp,
           expiresAt,
         },
       ]);
-      // Relay encrypted message directly to indexer
       const ciphertextBase64 = btoa(String.fromCharCode(...ciphertext));
       postMessage(
         roomPda.toBase58(),
         messagePda.toBase58(),
-        wallet.publicKey!.toBase58(),
+        senderKey.toBase58(),
         ciphertextBase64,
         timestamp,
       );
@@ -259,10 +317,13 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
     const styles: Record<string, string> = {
       bronze: "text-amber-500",
       silver: "text-gray-300",
-      gold:   "text-yellow-400",
+      gold: "text-yellow-400",
     };
     return (
-      <span className={`text-[9px] font-bold ${styles[rep.tier]}`} title={`${rep.tier} — ${rep.total} actions`}>
+      <span
+        className={`text-[9px] font-bold ${styles[rep.tier]}`}
+        title={`${rep.tier} — ${rep.total} actions`}
+      >
         ◆
       </span>
     );
@@ -288,7 +349,10 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
             <span className="text-conclave-muted mx-2">&middot;</span>
             <span className="text-gray-300">{m.text}</span>
             {m.expiresAt && (
-              <span className="ml-2 text-xs text-yellow-400/70" title="Ephemeral message">
+              <span
+                className="ml-2 text-xs text-yellow-400/70"
+                title="Ephemeral message"
+              >
                 {formatCountdown(m.expiresAt)}
               </span>
             )}
@@ -297,6 +361,11 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
         <div ref={bottomRef} />
       </div>
       {error && <p className="text-red-400 text-sm mb-2">{error}</p>}
+      {sessionKeypair && (
+        <p className="text-[10px] text-green-400/70 mb-1">
+          Gas-free mode — messages sign automatically
+        </p>
+      )}
       <form onSubmit={sendMessage} className="flex gap-2 items-center">
         <button
           type="button"
@@ -306,9 +375,18 @@ export default function ChatRoom({ roomPda, groupKey }: ChatRoomProps) {
               ? "border-yellow-400/50 bg-yellow-400/10 text-yellow-400"
               : "border-conclave-border text-conclave-muted hover:text-white"
           }`}
-          title={ephemeral ? "Ephemeral mode ON — messages self-destruct" : "Enable ephemeral mode"}
+          title={
+            ephemeral
+              ? "Ephemeral mode ON — messages self-destruct"
+              : "Enable ephemeral mode"
+          }
         >
-          {ephemeral ? `${EPHEMERAL_DURATIONS.find((d) => d.seconds === ephemeralDuration)?.label || ""}` : ""}
+          {ephemeral
+            ? `${
+                EPHEMERAL_DURATIONS.find((d) => d.seconds === ephemeralDuration)
+                  ?.label || ""
+              }`
+            : ""}
         </button>
         {ephemeral && (
           <select

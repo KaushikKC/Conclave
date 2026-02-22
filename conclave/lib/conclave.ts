@@ -67,6 +67,29 @@ export function getMessagePda(
   return pda;
 }
 
+export function getSessionPda(
+  room: PublicKey,
+  owner: PublicKey,
+  programId: PublicKey = CONCLAVE_PROGRAM_ID,
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("session"), room.toBuffer(), owner.toBuffer()],
+    programId,
+  );
+  return pda;
+}
+
+export function getTreasuryPda(
+  room: PublicKey,
+  programId: PublicKey = CONCLAVE_PROGRAM_ID,
+): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("treasury"), room.toBuffer()],
+    programId,
+  );
+  return pda;
+}
+
 export interface DaoRoomAccount {
   authority: PublicKey;
   governanceMint: PublicKey;

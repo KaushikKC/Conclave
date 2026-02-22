@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { useConclaveProgram } from "../../../../hooks/useConclaveProgram";
-import { getMemberPda, getVoteCommitmentPda } from "../../../../lib/conclave";
+import { getMemberPda, getVoteCommitmentPda, getTreasuryPda } from "../../../../lib/conclave";
 import { createVoteCommitment, createQuadraticVoteCommitment } from "../../../../app/sdk/crypto";
 import { fetchProposal, fetchProposalVotes, fetchRoom, notifyIndexer, storeVoteData, fetchVoteData } from "../../../../lib/api";
 import { getAnonAlias } from "../../../../lib/anon";
@@ -38,6 +38,10 @@ export default function ProposalDetailPage() {
   const [voteLoading, setVoteLoading] = useState(false);
   const [revealLoading, setRevealLoading] = useState(false);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
+  const [executeLoading, setExecuteLoading] = useState(false);
+  const [executeRecipient, setExecuteRecipient] = useState("");
+  const [executeAmount, setExecuteAmount] = useState("0.01");
+  const [treasuryBalance, setTreasuryBalance] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [roomAuthority, setRoomAuthority] = useState<string | null>(null);
   const [groupKey, setGroupKey] = useState<Uint8Array | null>(null);
@@ -356,6 +360,58 @@ export default function ProposalDetailPage() {
       setError(err?.message || "Reveal failed");
     } finally {
       setRevealLoading(false);
+    }
+  };
+
+  // Fetch treasury balance when proposal is finalized and passed
+  useEffect(() => {
+    if (!proposal?.isFinalized || !proposal?.room || !program) return;
+    if (proposal.voteYesCount <= proposal.voteNoCount) return;
+    const roomPubkey = new PublicKey(proposal.room);
+    const treasuryPda = getTreasuryPda(roomPubkey, program.programId);
+    connection.getAccountInfo(treasuryPda).then((info) => {
+      if (info) setTreasuryBalance(info.lamports / 1e9);
+    }).catch(() => {});
+  }, [proposal?.isFinalized, proposal?.room, program, connection]);
+
+  const handleExecuteAction = async () => {
+    if (!program || !wallet?.publicKey || !proposalPda || !proposal) return;
+    const lamports = Math.round(parseFloat(executeAmount) * 1e9);
+    if (!lamports || lamports <= 0 || !executeRecipient) {
+      setError("Enter valid recipient and amount.");
+      return;
+    }
+    let recipientPubkey: PublicKey;
+    try { recipientPubkey = new PublicKey(executeRecipient); } catch {
+      setError("Invalid recipient address.");
+      return;
+    }
+
+    setExecuteLoading(true);
+    setError("");
+    try {
+      const roomPubkey = new PublicKey(proposal.room);
+      const proposalPubkey = new PublicKey(proposalPda);
+      const treasuryPda = getTreasuryPda(roomPubkey, program.programId);
+      const BN = require("@coral-xyz/anchor").BN;
+      await program.methods
+        .executeProposalAction(new BN(lamports))
+        .accountsPartial({
+          authority: wallet.publicKey,
+          room: roomPubkey,
+          proposal: proposalPubkey,
+          treasury: treasuryPda,
+          recipient: recipientPubkey,
+        })
+        .rpc();
+      setTreasuryBalance((prev) => prev !== null ? prev - lamports / 1e9 : null);
+      setExecuteRecipient("");
+      setExecuteAmount("0.01");
+      notifyIndexer([proposalPda, treasuryPda.toBase58()]);
+    } catch (err: any) {
+      setError(err?.message || "Execute failed");
+    } finally {
+      setExecuteLoading(false);
     }
   };
 
@@ -733,6 +789,51 @@ export default function ProposalDetailPage() {
           >
             {finalizeLoading ? "Finalizing…" : "Finalize proposal"}
           </button>
+        </div>
+      )}
+
+      {/* Treasury Execution — shown when proposal passed and authority is connected */}
+      {proposal.isFinalized &&
+        proposal.voteYesCount > proposal.voteNoCount &&
+        wallet?.publicKey &&
+        roomAuthority === wallet.publicKey.toBase58() && (
+        <div className="card border border-green-500/20">
+          <h2 className="font-semibold text-white mb-1">Execute Treasury Action</h2>
+          <p className="text-conclave-muted text-sm mb-3">
+            This proposal passed. As room authority, you can transfer SOL from the treasury.
+            {treasuryBalance !== null && (
+              <span className="text-conclave-accent ml-1">
+                Treasury: {treasuryBalance.toFixed(4)} SOL
+              </span>
+            )}
+          </p>
+          <div className="space-y-2">
+            <input
+              type="text"
+              value={executeRecipient}
+              onChange={(e) => setExecuteRecipient(e.target.value)}
+              placeholder="Recipient wallet address"
+              className="w-full bg-conclave-dark border border-conclave-border rounded-lg px-3 py-2 text-sm text-white placeholder-conclave-muted focus:outline-none focus:border-conclave-accent"
+            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.001"
+                min="0.001"
+                value={executeAmount}
+                onChange={(e) => setExecuteAmount(e.target.value)}
+                placeholder="SOL amount"
+                className="w-32 bg-conclave-dark border border-conclave-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-conclave-accent"
+              />
+              <button
+                onClick={handleExecuteAction}
+                disabled={executeLoading}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                {executeLoading ? "Executing…" : "Execute Transfer"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

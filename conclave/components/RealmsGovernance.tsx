@@ -61,7 +61,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             Could not fetch live data from the Realm. This can happen due to RPC rate limits.
           </p>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}`}
+            href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-sm px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
@@ -87,7 +87,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             </span>
           </div>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}`}
+            href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs text-conclave-accent hover:underline"
@@ -146,7 +146,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
         </p>
         <div className="flex flex-wrap gap-2">
           <a
-            href={`https://app.realms.today/dao/${realmAddress}`}
+            href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm px-4 py-2 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 hover:bg-purple-500/30 transition"
@@ -154,7 +154,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             DAO Dashboard
           </a>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}/members`}
+            href={`https://app.realms.today/dao/${realmAddress}/members?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm px-4 py-2 rounded-lg border border-conclave-border text-conclave-muted hover:text-white transition"
@@ -162,7 +162,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             Members
           </a>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}/treasury`}
+            href={`https://app.realms.today/dao/${realmAddress}/treasury?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm px-4 py-2 rounded-lg border border-conclave-border text-conclave-muted hover:text-white transition"

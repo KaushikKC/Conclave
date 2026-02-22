@@ -4,17 +4,32 @@ import { useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
+import {
+  PublicKey,
+  SystemProgram,
+  Keypair,
+  Transaction,
+} from "@solana/web3.js";
 import {
   TOKEN_PROGRAM_ID,
+  MintLayout,
+  createInitializeMintInstruction,
+  createMintToInstruction,
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
+import {
+  withCreateRealm,
+  withDepositGoverningTokens,
+  MintMaxVoteWeightSource,
+  getGovernanceProgramVersion,
+} from "@realms-today/spl-governance";
+import BN from "bn.js";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getRoomPda, getMemberPda } from "../../lib/conclave";
 import { generateGroupKey } from "../../app/sdk/crypto";
 import { postGroupKeyWithRetry, postRoomRealm, pushRoomToIndexer, pushMemberToIndexer } from "../../lib/api";
-import { fetchRealmInfo, verifyRealmsMembership } from "../../app/sdk/realms";
+import { fetchRealmInfo, verifyRealmsMembership, SPL_GOVERNANCE_PROGRAM_ID } from "../../app/sdk/realms";
 
 const MAX_NAME_LEN = 50;
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
@@ -23,7 +38,7 @@ type MintMode = "realms" | "custom";
 
 export default function CreateRoomPage() {
   const router = useRouter();
-  const { publicKey: wallet, connected } = useWallet();
+  const { publicKey: wallet, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { program } = useConclaveProgram();
   const [name, setName] = useState("");
@@ -39,6 +54,13 @@ export default function CreateRoomPage() {
   const [realmVerified, setRealmVerified] = useState(false);
   const [realmLoading, setRealmLoading] = useState(false);
   const [realmError, setRealmError] = useState("");
+
+  // Create Realm state
+  const [showCreateRealm, setShowCreateRealm] = useState(false);
+  const [createRealmName, setCreateRealmName] = useState("");
+  const [createRealmLoading, setCreateRealmLoading] = useState(false);
+  const [createRealmStatus, setCreateRealmStatus] = useState("");
+  const [createRealmError, setCreateRealmError] = useState("");
 
   const handleLookupRealm = async () => {
     if (!wallet) {
@@ -83,6 +105,113 @@ export default function CreateRoomPage() {
       setRealmError(err?.message || "Failed to fetch Realm info.");
     } finally {
       setRealmLoading(false);
+    }
+  };
+
+  const handleCreateRealm = async () => {
+    if (!wallet || !connected || !signTransaction) {
+      setCreateRealmError("Connect your wallet first.");
+      return;
+    }
+    const daoName = createRealmName.trim() || `${name.trim() || "My DAO"} Realm`;
+    setCreateRealmLoading(true);
+    setCreateRealmError("");
+    setCreateRealmStatus("");
+
+    try {
+      // Step 1: Get governance program version
+      setCreateRealmStatus("Detecting SPL Governance version...");
+      const programVersion = await getGovernanceProgramVersion(connection, SPL_GOVERNANCE_PROGRAM_ID);
+
+      // Step 2: Create governance token mint
+      setCreateRealmStatus("Creating governance token (1/3)...");
+      const mintKeypair = Keypair.generate();
+      const mintRent = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
+      const ata = getAssociatedTokenAddressSync(mintKeypair.publicKey, wallet);
+
+      const tx1 = new Transaction();
+      tx1.add(
+        SystemProgram.createAccount({
+          fromPubkey: wallet,
+          newAccountPubkey: mintKeypair.publicKey,
+          lamports: mintRent,
+          space: MintLayout.span,
+          programId: TOKEN_PROGRAM_ID,
+        }),
+        createInitializeMintInstruction(mintKeypair.publicKey, 6, wallet, null),
+        createAssociatedTokenAccountInstruction(wallet, ata, wallet, mintKeypair.publicKey),
+        createMintToInstruction(mintKeypair.publicKey, ata, wallet, BigInt(1_000_000 * 1e6)),
+      );
+      tx1.feePayer = wallet;
+      const { blockhash: bh1, lastValidBlockHeight: lbh1 } = await connection.getLatestBlockhash("confirmed");
+      tx1.recentBlockhash = bh1;
+      tx1.partialSign(mintKeypair);
+      // wallet adapter signs remaining (feePayer)
+      const signedTx1 = await signTransaction(tx1);
+      const sig1 = await connection.sendRawTransaction(signedTx1.serialize());
+      await connection.confirmTransaction({ signature: sig1, blockhash: bh1, lastValidBlockHeight: lbh1 }, "confirmed");
+
+      // Step 3: Create Realm
+      setCreateRealmStatus("Creating Realm on-chain (2/3)...");
+      const createRealmIxs: any[] = [];
+      const realmAddress = await withCreateRealm(
+        createRealmIxs,
+        SPL_GOVERNANCE_PROGRAM_ID,
+        programVersion,
+        daoName,
+        wallet,           // realm authority
+        mintKeypair.publicKey,  // community mint
+        wallet,           // payer
+        undefined,        // no council mint
+        MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
+        new BN(1) as any, // min weight to create governance (1 micro-token)
+        undefined,
+        undefined,
+      );
+      const tx2 = new Transaction().add(...createRealmIxs);
+      tx2.feePayer = wallet;
+      const { blockhash: bh2, lastValidBlockHeight: lbh2 } = await connection.getLatestBlockhash("confirmed");
+      tx2.recentBlockhash = bh2;
+      const signedTx2 = await signTransaction(tx2);
+      const sig2 = await connection.sendRawTransaction(signedTx2.serialize());
+      await connection.confirmTransaction({ signature: sig2, blockhash: bh2, lastValidBlockHeight: lbh2 }, "confirmed");
+
+      // Step 4: Deposit governing tokens (become a member)
+      setCreateRealmStatus("Joining as member (3/3)...");
+      const depositIxs: any[] = [];
+      await withDepositGoverningTokens(
+        depositIxs,
+        SPL_GOVERNANCE_PROGRAM_ID,
+        programVersion,
+        realmAddress,
+        ata,
+        mintKeypair.publicKey,
+        wallet,   // governing token owner
+        wallet,   // source authority (ATA owner)
+        wallet,   // payer
+        new BN(100_000 * 1e6) as any, // deposit 100K tokens
+      );
+      const tx3 = new Transaction().add(...depositIxs);
+      tx3.feePayer = wallet;
+      const { blockhash: bh3, lastValidBlockHeight: lbh3 } = await connection.getLatestBlockhash("confirmed");
+      tx3.recentBlockhash = bh3;
+      const signedTx3 = await signTransaction(tx3);
+      const sig3 = await connection.sendRawTransaction(signedTx3.serialize());
+      await connection.confirmTransaction({ signature: sig3, blockhash: bh3, lastValidBlockHeight: lbh3 }, "confirmed");
+
+      // Auto-fill realm address and lookup info
+      setCreateRealmStatus("");
+      setCreateRealmName("");
+      setShowCreateRealm(false);
+      setRealmAddressStr(realmAddress.toBase58());
+      setGovernanceMintStr(mintKeypair.publicKey.toBase58());
+      setRealmName(daoName);
+      setRealmVerified(true);
+    } catch (err: any) {
+      setCreateRealmError(err?.message || "Failed to create Realm.");
+      setCreateRealmStatus("");
+    } finally {
+      setCreateRealmLoading(false);
     }
   };
 
@@ -330,6 +459,51 @@ export default function CreateRoomPage() {
             {realmError && (
               <p className="text-red-400 text-sm">{realmError}</p>
             )}
+
+            {/* Create Realm on Devnet */}
+            <div className="rounded-lg border border-conclave-border/50 bg-conclave-dark/30 p-3">
+              <button
+                type="button"
+                onClick={() => { setShowCreateRealm(!showCreateRealm); setCreateRealmError(""); }}
+                className="flex items-center justify-between w-full text-sm text-conclave-muted hover:text-white transition"
+              >
+                <span>Don't have a Realm? Create one on devnet</span>
+                <span className="text-xs">{showCreateRealm ? "▲" : "▼"}</span>
+              </button>
+
+              {showCreateRealm && (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-conclave-muted">
+                    Creates a new Realms DAO on devnet with a fresh governance token.
+                    You'll sign 3 transactions. The Realm address will be auto-filled.
+                  </p>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">DAO name (optional)</label>
+                    <input
+                      type="text"
+                      value={createRealmName}
+                      onChange={(e) => setCreateRealmName(e.target.value)}
+                      placeholder={name.trim() ? `${name.trim()} Realm` : "My DAO Realm"}
+                      className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none text-sm"
+                    />
+                  </div>
+                  {createRealmError && (
+                    <p className="text-red-400 text-xs">{createRealmError}</p>
+                  )}
+                  {createRealmStatus && (
+                    <p className="text-conclave-accent text-xs">{createRealmStatus}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleCreateRealm}
+                    disabled={createRealmLoading}
+                    className="btn-primary text-sm disabled:opacity-50 w-full"
+                  >
+                    {createRealmLoading ? createRealmStatus || "Creating..." : "Create Realm on Devnet"}
+                  </button>
+                </div>
+              )}
+            </div>
 
             {realmName && (
               <div className="rounded-lg border border-conclave-border bg-conclave-dark/50 p-3 space-y-2">

@@ -15,9 +15,17 @@ import {
 } from "@solana/spl-token";
 import { useConclaveProgram } from "../../hooks/useConclaveProgram";
 import { getMemberPda } from "../../lib/conclave";
+import { Keypair } from "@solana/web3.js";
 import ChatRoom from "../../components/ChatRoom";
 import MemberList from "../../components/MemberList";
 import RealmsGovernance from "../../components/RealmsGovernance";
+import TreasuryCard from "../../components/TreasuryCard";
+import {
+  useSessionKey,
+  generateAndStoreSessionKeypair,
+  clearSessionKeypair,
+  getSessionPda,
+} from "../../hooks/useSessionKey";
 import {
   fetchRoom,
   fetchRoomMembers,
@@ -38,7 +46,7 @@ import {
 
 const GROUP_KEY_STORAGE_PREFIX = "conclave_group_key_";
 
-type Tab = "chat" | "proposals" | "members" | "realms";
+type Tab = "chat" | "proposals" | "members" | "treasury" | "realms";
 
 interface RoomData {
   name: string;
@@ -65,9 +73,15 @@ export default function RoomDetailPage() {
   const [publishKeyLoading, setPublishKeyLoading] = useState(false);
   const [publishKeyDone, setPublishKeyDone] = useState(false);
   const [realmName, setRealmName] = useState<string | null>(null);
-  const [realmMemberVerified, setRealmMemberVerified] = useState<boolean | null>(null);
+  const [realmMemberVerified, setRealmMemberVerified] = useState<
+    boolean | null
+  >(null);
+  const [sessionKeypair, setSessionKeypair] = useState<Keypair | null>(null);
+  const [sessionLoading, setSessionLoading] = useState(false);
+  const [sessionError, setSessionError] = useState("");
 
-  const inviteKey = typeof router.query.key === "string" ? router.query.key : null;
+  const inviteKey =
+    typeof router.query.key === "string" ? router.query.key : null;
   const roomPda = typeof roomPdaStr === "string" ? roomPdaStr : null;
   const { programReadOnly } = useConclaveProgram();
   const [inviteCopied, setInviteCopied] = useState(false);
@@ -77,9 +91,10 @@ export default function RoomDetailPage() {
     if (!roomPda) return;
     let cancelled = false;
     // Always check localStorage for realm address (most reliable source)
-    const localRealm = typeof window !== "undefined"
-      ? localStorage.getItem(`conclave_realm_${roomPda}`)
-      : null;
+    const localRealm =
+      typeof window !== "undefined"
+        ? localStorage.getItem(`conclave_realm_${roomPda}`)
+        : null;
 
     (async () => {
       try {
@@ -153,7 +168,11 @@ export default function RoomDetailPage() {
       if (programReadOnly && !cancelled) {
         try {
           const roomPubkey = new PublicKey(roomPda);
-          const memberPda = getMemberPda(roomPubkey, wallet, programReadOnly.programId);
+          const memberPda = getMemberPda(
+            roomPubkey,
+            wallet,
+            programReadOnly.programId,
+          );
           const acc = await connection.getAccountInfo(memberPda);
           if (!cancelled) setIsMember(!!acc);
         } catch {
@@ -187,7 +206,8 @@ export default function RoomDetailPage() {
           );
           if (!cancelled) {
             setRealmMemberVerified(
-              membership !== null && membership.governingTokenDepositAmount.gtn(0),
+              membership !== null &&
+                membership.governingTokenDepositAmount.gtn(0),
             );
           }
         }
@@ -195,7 +215,9 @@ export default function RoomDetailPage() {
         // Non-fatal
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [room?.realmAddress, wallet, connection]);
 
   // Load group key from localStorage, invite link, or indexer.
@@ -209,8 +231,14 @@ export default function RoomDetailPage() {
       // If invite link has a key, store it immediately
       if (inviteKey) {
         try {
-          const decoded = Uint8Array.from(atob(inviteKey.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
-          localStorage.setItem(GROUP_KEY_STORAGE_PREFIX + roomPda, JSON.stringify(Array.from(decoded)));
+          const decoded = Uint8Array.from(
+            atob(inviteKey.replace(/-/g, "+").replace(/_/g, "/")),
+            (c) => c.charCodeAt(0),
+          );
+          localStorage.setItem(
+            GROUP_KEY_STORAGE_PREFIX + roomPda,
+            JSON.stringify(Array.from(decoded)),
+          );
           localKey = decoded;
           if (!cancelled) setGroupKey(decoded);
         } catch {}
@@ -249,16 +277,100 @@ export default function RoomDetailPage() {
         const isCreator = room.authority === wallet.toBase58();
         if (isCreator) {
           const b64 = btoa(String.fromCharCode(...localKey));
-          postGroupKeyWithRetry(roomPda, b64).then(() => {
-            if (!cancelled) setPublishKeyDone(true);
-          }).catch((err) => {
-            console.warn("Auto-republish group key failed:", err);
-          });
+          postGroupKeyWithRetry(roomPda, b64)
+            .then(() => {
+              if (!cancelled) setPublishKeyDone(true);
+            })
+            .catch((err) => {
+              console.warn("Auto-republish group key failed:", err);
+            });
         }
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [roomPda, room, wallet, inviteKey]);
+
+  // Load existing session keypair from localStorage on mount
+  useEffect(() => {
+    if (!roomPda) return;
+    const stored = (() => {
+      try {
+        const raw = localStorage.getItem("conclave_sk_" + roomPda);
+        if (!raw) return null;
+        const { secretKey, expiresAt } = JSON.parse(raw);
+        if (expiresAt < Math.floor(Date.now() / 1000)) return null;
+        return Keypair.fromSecretKey(new Uint8Array(secretKey));
+      } catch {
+        return null;
+      }
+    })();
+    setSessionKeypair(stored);
+  }, [roomPda]);
+
+  const handleCreateSession = async () => {
+    if (!program || !wallet || !roomPda) return;
+    setSessionLoading(true);
+    setSessionError("");
+    try {
+      const { keypair, expiresAt } = generateAndStoreSessionKeypair(roomPda);
+      const roomPubkey = new PublicKey(roomPda);
+      const sessionPda = getSessionPda(roomPubkey, wallet, program.programId);
+      const memberPda = getMemberPda(roomPubkey, wallet, program.programId);
+
+      // Fund session key with 0.005 SOL for fees + create session PDA
+      const fundIx = require("@solana/web3.js").SystemProgram.transfer({
+        fromPubkey: wallet,
+        toPubkey: keypair.publicKey,
+        lamports: 100_000_000, // 0.1 SOL — covers ~11 open message accounts (0.0086 SOL rent each)
+      });
+
+      const sessionIx = await program.methods
+        .createSession(
+          keypair.publicKey,
+          new (require("@coral-xyz/anchor").BN)(expiresAt),
+        )
+        .accountsPartial({
+          wallet,
+          room: roomPubkey,
+          member: memberPda,
+          session: sessionPda,
+          systemProgram: require("@solana/web3.js").SystemProgram.programId,
+        })
+        .instruction();
+
+      const { blockhash, lastValidBlockHeight } =
+        await connection.getLatestBlockhash("confirmed");
+      const tx = new (require("@solana/web3.js").Transaction)();
+      tx.recentBlockhash = blockhash;
+      tx.lastValidBlockHeight = lastValidBlockHeight;
+      tx.feePayer = wallet;
+      tx.add(fundIx, sessionIx);
+
+      const sig = await (program.provider as any).wallet.sendTransaction(
+        tx,
+        connection,
+      );
+      await connection.confirmTransaction(
+        { signature: sig, blockhash, lastValidBlockHeight },
+        "confirmed",
+      );
+
+      setSessionKeypair(keypair);
+    } catch (err: any) {
+      setSessionError(err?.message || "Failed to create session");
+      clearSessionKeypair(roomPda);
+    } finally {
+      setSessionLoading(false);
+    }
+  };
+
+  const handleClearSession = () => {
+    if (!roomPda) return;
+    clearSessionKeypair(roomPda);
+    setSessionKeypair(null);
+  };
 
   const handleJoin = async () => {
     if (!program || !wallet || !roomPda || !room) return;
@@ -417,7 +529,7 @@ export default function RoomDetailPage() {
                 Realms DAO
               </span>
               <a
-                href={`https://app.realms.today/dao/${room.realmAddress}`}
+                href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-conclave-accent hover:underline"
@@ -436,7 +548,8 @@ export default function RoomDetailPage() {
           {room.realmAddress && realmName ? (
             <div className="mb-4">
               <p className="text-sm text-gray-300 mb-2">
-                This room requires membership in <span className="text-white font-medium">{realmName}</span> DAO.
+                This room requires membership in{" "}
+                <span className="text-white font-medium">{realmName}</span> DAO.
               </p>
               {realmMemberVerified === true && (
                 <p className="text-xs text-green-400 flex items-center gap-1 mb-2">
@@ -447,7 +560,8 @@ export default function RoomDetailPage() {
               {realmMemberVerified === false && (
                 <p className="text-xs text-yellow-400 flex items-center gap-1 mb-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
-                  Not a member of this Realm — you still need the governance token to join
+                  Not a member of this Realm — you still need the governance
+                  token to join
                 </p>
               )}
             </div>
@@ -478,7 +592,9 @@ export default function RoomDetailPage() {
   const copyInviteLink = () => {
     if (!groupKey || !roomPda) return;
     const keyBase64 = btoa(String.fromCharCode(...groupKey))
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const link = `${baseUrl}/rooms/${roomPda}?key=${keyBase64}`;
     navigator.clipboard.writeText(link).then(() => {
@@ -513,7 +629,7 @@ export default function RoomDetailPage() {
         <h1 className="text-2xl font-bold text-white">{room.name}</h1>
         {room.realmAddress && (
           <a
-            href={`https://app.realms.today/dao/${room.realmAddress}`}
+            href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium hover:bg-purple-500/30 transition"
@@ -560,8 +676,52 @@ export default function RoomDetailPage() {
         </div>
       )}
 
+      {/* Session key banner */}
+      {isMember && (
+        <div className="mb-4">
+          {sessionKeypair ? (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20 text-xs">
+              <span className="text-green-400">
+                Gas-free chat active — messages send without wallet popups
+              </span>
+              <button
+                onClick={handleClearSession}
+                className="text-conclave-muted hover:text-red-400 transition ml-4"
+              >
+                Revoke
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-conclave-card border border-conclave-border text-xs">
+              <span className="text-conclave-muted">
+                Enable gas-free chat — one wallet approval, 0.1 SOL deposited
+                for message fees
+              </span>
+              <button
+                onClick={handleCreateSession}
+                disabled={sessionLoading}
+                className="ml-4 text-conclave-accent hover:underline disabled:opacity-50"
+              >
+                {sessionLoading ? "Creating…" : "Enable ⚡"}
+              </button>
+            </div>
+          )}
+          {sessionError && (
+            <p className="text-red-400 text-xs mt-1">{sessionError}</p>
+          )}
+        </div>
+      )}
+
       <div className="flex gap-2 border-b border-conclave-border mb-6 overflow-x-auto pb-px -mx-4 px-4 sm:mx-0 sm:px-0">
-        {(["chat", "proposals", "members", ...(room.realmAddress ? ["realms" as const] : [])] as const).map((t) => (
+        {(
+          [
+            "chat",
+            "proposals",
+            "members",
+            "treasury",
+            ...(room.realmAddress ? ["realms" as const] : []),
+          ] as const
+        ).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -574,6 +734,7 @@ export default function RoomDetailPage() {
             {t === "chat" && "Chat"}
             {t === "proposals" && "Proposals"}
             {t === "members" && "Members"}
+            {t === "treasury" && "Treasury"}
             {t === "realms" && "Realms DAO"}
           </button>
         ))}
@@ -581,7 +742,11 @@ export default function RoomDetailPage() {
 
       {tab === "chat" && (
         <div className="card">
-          <ChatRoom roomPda={roomPubkey} groupKey={groupKey} />
+          <ChatRoom
+            roomPda={roomPubkey}
+            groupKey={groupKey}
+            sessionKeypair={sessionKeypair}
+          />
         </div>
       )}
 
@@ -612,6 +777,12 @@ export default function RoomDetailPage() {
         </div>
       )}
 
+      {tab === "treasury" && (
+        <div className="card">
+          <TreasuryCard roomPda={roomPda} roomAuthority={room.authority} />
+        </div>
+      )}
+
       {tab === "realms" && room.realmAddress && (
         <div className="card">
           <h2 className="font-semibold text-white mb-4">Realms Governance</h2>
@@ -622,7 +793,10 @@ export default function RoomDetailPage() {
   );
 }
 
-function getProposalPhase(deadline: number, isFinalized: boolean): {
+function getProposalPhase(
+  deadline: number,
+  isFinalized: boolean,
+): {
   label: string;
   color: string;
   bgColor: string;
@@ -630,12 +804,27 @@ function getProposalPhase(deadline: number, isFinalized: boolean): {
 } {
   const now = Math.floor(Date.now() / 1000);
   if (isFinalized) {
-    return { label: "Finalized", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+    return {
+      label: "Finalized",
+      color: "text-conclave-muted",
+      bgColor: "bg-white/5",
+      borderColor: "border-white/10",
+    };
   }
   if (now < deadline) {
-    return { label: "Voting", color: "text-green-400", bgColor: "bg-green-500/10", borderColor: "border-green-500/30" };
+    return {
+      label: "Voting",
+      color: "text-green-400",
+      bgColor: "bg-green-500/10",
+      borderColor: "border-green-500/30",
+    };
   }
-  return { label: "Reveal", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+  return {
+    label: "Reveal",
+    color: "text-yellow-400",
+    bgColor: "bg-yellow-500/10",
+    borderColor: "border-yellow-500/30",
+  };
 }
 
 function formatTimeLeft(deadline: number): string {
@@ -644,7 +833,10 @@ function formatTimeLeft(deadline: number): string {
   if (diff <= 0) return "Ended";
   if (diff < 60) return `${diff}s left`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m left`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m left`;
+  if (diff < 86400)
+    return `${Math.floor(diff / 3600)}h ${Math.floor(
+      (diff % 3600) / 60,
+    )}m left`;
   return `${Math.floor(diff / 86400)}d left`;
 }
 
@@ -656,30 +848,86 @@ function getRealmProposalBadge(state: ProposalState): {
 } {
   switch (state) {
     case ProposalState.Voting:
-      return { label: "Voting", color: "text-green-400", bgColor: "bg-green-500/10", borderColor: "border-green-500/30" };
+      return {
+        label: "Voting",
+        color: "text-green-400",
+        bgColor: "bg-green-500/10",
+        borderColor: "border-green-500/30",
+      };
     case ProposalState.Succeeded:
-      return { label: "Passed", color: "text-blue-400", bgColor: "bg-blue-500/10", borderColor: "border-blue-500/30" };
+      return {
+        label: "Passed",
+        color: "text-blue-400",
+        bgColor: "bg-blue-500/10",
+        borderColor: "border-blue-500/30",
+      };
     case ProposalState.Defeated:
-      return { label: "Defeated", color: "text-red-400", bgColor: "bg-red-500/10", borderColor: "border-red-500/30" };
+      return {
+        label: "Defeated",
+        color: "text-red-400",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/30",
+      };
     case ProposalState.Completed:
-      return { label: "Completed", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+      return {
+        label: "Completed",
+        color: "text-conclave-muted",
+        bgColor: "bg-white/5",
+        borderColor: "border-white/10",
+      };
     case ProposalState.Executing:
     case ProposalState.ExecutingWithErrors:
-      return { label: "Executing", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+      return {
+        label: "Executing",
+        color: "text-yellow-400",
+        bgColor: "bg-yellow-500/10",
+        borderColor: "border-yellow-500/30",
+      };
     case ProposalState.Cancelled:
-      return { label: "Cancelled", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+      return {
+        label: "Cancelled",
+        color: "text-conclave-muted",
+        bgColor: "bg-white/5",
+        borderColor: "border-white/10",
+      };
     case ProposalState.Vetoed:
-      return { label: "Vetoed", color: "text-red-400", bgColor: "bg-red-500/10", borderColor: "border-red-500/30" };
+      return {
+        label: "Vetoed",
+        color: "text-red-400",
+        bgColor: "bg-red-500/10",
+        borderColor: "border-red-500/30",
+      };
     case ProposalState.Draft:
-      return { label: "Draft", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+      return {
+        label: "Draft",
+        color: "text-conclave-muted",
+        bgColor: "bg-white/5",
+        borderColor: "border-white/10",
+      };
     case ProposalState.SigningOff:
-      return { label: "Signing Off", color: "text-yellow-400", bgColor: "bg-yellow-500/10", borderColor: "border-yellow-500/30" };
+      return {
+        label: "Signing Off",
+        color: "text-yellow-400",
+        bgColor: "bg-yellow-500/10",
+        borderColor: "border-yellow-500/30",
+      };
     default:
-      return { label: "Unknown", color: "text-conclave-muted", bgColor: "bg-white/5", borderColor: "border-white/10" };
+      return {
+        label: "Unknown",
+        color: "text-conclave-muted",
+        bgColor: "bg-white/5",
+        borderColor: "border-white/10",
+      };
   }
 }
 
-function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddress?: string | null }) {
+function ProposalsList({
+  roomPda,
+  realmAddress,
+}: {
+  roomPda: string;
+  realmAddress?: string | null;
+}) {
   const { connection } = useConnection();
   const [list, setList] = useState<
     {
@@ -697,7 +945,10 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
   const [now, setNow] = useState(Math.floor(Date.now() / 1000));
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
+    const interval = setInterval(
+      () => setNow(Math.floor(Date.now() / 1000)),
+      1000,
+    );
     return () => clearInterval(interval);
   }, []);
 
@@ -729,13 +980,18 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
     (async () => {
       try {
         const realmPubkey = new PublicKey(realmAddress);
-        const proposals = await fetchRealmProposalsFromSdk(connection, realmPubkey);
+        const proposals = await fetchRealmProposalsFromSdk(
+          connection,
+          realmPubkey,
+        );
         if (!cancelled) setRealmProposals(proposals);
       } catch {
         if (!cancelled) setRealmProposalsError(true);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [realmAddress, connection]);
 
   const hasNoProposals = list.length === 0 && realmProposals.length === 0;
@@ -749,19 +1005,22 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
       {/* Realms proposals */}
       {realmProposals.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-purple-400 uppercase tracking-wider mb-2">Realms DAO Proposals</h3>
+          <h3 className="text-xs font-medium text-purple-400 uppercase tracking-wider mb-2">
+            Realms DAO Proposals
+          </h3>
           <ul className="space-y-3">
             {realmProposals.map((rp) => {
               const badge = getRealmProposalBadge(rp.state);
               const yesVotes = parseInt(rp.yesVotes) || 0;
               const noVotes = parseInt(rp.noVotes) || 0;
               const totalVotes = yesVotes + noVotes;
-              const yesPercent = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 0;
+              const yesPercent =
+                totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 0;
 
               return (
                 <li key={rp.pubkey}>
                   <a
-                    href={`https://app.realms.today/dao/${realmAddress}/proposal/${rp.pubkey}`}
+                    href={`https://app.realms.today/dao/${realmAddress}/proposal/${rp.pubkey}?cluster=devnet`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block rounded-xl border border-purple-500/20 p-4 hover:border-purple-500/40 transition-all"
@@ -771,22 +1030,38 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
                         <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-medium">
                           Realms
                         </span>
-                        <h3 className="font-semibold text-white text-sm">{rp.name}</h3>
+                        <h3 className="font-semibold text-white text-sm">
+                          {rp.name}
+                        </h3>
                       </div>
-                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${badge.bgColor} ${badge.color} border ${badge.borderColor} font-medium ${badge.label === "Voting" ? "animate-pulse" : ""}`}>
+                      <span
+                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
+                          badge.bgColor
+                        } ${badge.color} border ${
+                          badge.borderColor
+                        } font-medium ${
+                          badge.label === "Voting" ? "animate-pulse" : ""
+                        }`}
+                      >
                         {badge.label}
                       </span>
                     </div>
 
                     {rp.descriptionLink && (
-                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{rp.descriptionLink}</p>
+                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">
+                        {rp.descriptionLink}
+                      </p>
                     )}
 
                     {totalVotes > 0 && (
                       <div className="mb-2">
                         <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
-                          <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
+                          <span className="text-green-400 font-medium">
+                            Yes {yesPercent}%
+                          </span>
+                          <span className="text-red-400 font-medium">
+                            No {100 - yesPercent}%
+                          </span>
                         </div>
                         <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
                           <div
@@ -794,15 +1069,31 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
                             style={{ width: `${yesPercent}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
+                        <p className="text-[10px] text-conclave-muted mt-1">
+                          {totalVotes} votes
+                        </p>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between text-[10px] text-conclave-muted">
-                      {rp.votingAt && <span>Started {new Date(rp.votingAt * 1000).toLocaleDateString()}</span>}
-                      {rp.votingCompletedAt && <span>Ended {new Date(rp.votingCompletedAt * 1000).toLocaleDateString()}</span>}
+                      {rp.votingAt && (
+                        <span>
+                          Started{" "}
+                          {new Date(rp.votingAt * 1000).toLocaleDateString()}
+                        </span>
+                      )}
+                      {rp.votingCompletedAt && (
+                        <span>
+                          Ended{" "}
+                          {new Date(
+                            rp.votingCompletedAt * 1000,
+                          ).toLocaleDateString()}
+                        </span>
+                      )}
                       {!rp.votingAt && !rp.votingCompletedAt && <span />}
-                      <span className="text-purple-400">View on Realms &rarr;</span>
+                      <span className="text-purple-400">
+                        View on Realms &rarr;
+                      </span>
                     </div>
                   </a>
                 </li>
@@ -813,20 +1104,27 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
       )}
 
       {realmProposalsError && (
-        <p className="text-xs text-conclave-muted italic">Could not load Realms proposals (rate limited or unavailable).</p>
+        <p className="text-xs text-conclave-muted italic">
+          Could not load Realms proposals (rate limited or unavailable).
+        </p>
       )}
 
       {/* Conclave proposals */}
       {list.length > 0 && (
         <div>
           {realmProposals.length > 0 && (
-            <h3 className="text-xs font-medium text-conclave-accent uppercase tracking-wider mb-2">Conclave Proposals</h3>
+            <h3 className="text-xs font-medium text-conclave-accent uppercase tracking-wider mb-2">
+              Conclave Proposals
+            </h3>
           )}
           <ul className="space-y-3">
             {list.map((p) => {
               const phase = getProposalPhase(p.deadline, p.isFinalized);
               const totalVotes = p.voteYesCount + p.voteNoCount;
-              const yesPercent = totalVotes > 0 ? Math.round((p.voteYesCount / totalVotes) * 100) : 0;
+              const yesPercent =
+                totalVotes > 0
+                  ? Math.round((p.voteYesCount / totalVotes) * 100)
+                  : 0;
               const deadlinePassed = p.deadline <= now;
 
               return (
@@ -836,21 +1134,37 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
                     className="block rounded-xl border border-conclave-border/50 p-4 hover:border-conclave-accent/30 transition-all"
                   >
                     <div className="flex items-start justify-between gap-3 mb-2">
-                      <h3 className="font-semibold text-white text-sm">{p.title}</h3>
-                      <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${phase.bgColor} ${phase.color} border ${phase.borderColor} font-medium ${phase.label === "Voting" ? "animate-pulse" : ""}`}>
+                      <h3 className="font-semibold text-white text-sm">
+                        {p.title}
+                      </h3>
+                      <span
+                        className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full ${
+                          phase.bgColor
+                        } ${phase.color} border ${
+                          phase.borderColor
+                        } font-medium ${
+                          phase.label === "Voting" ? "animate-pulse" : ""
+                        }`}
+                      >
                         {phase.label}
                       </span>
                     </div>
 
                     {p.description && (
-                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">{p.description}</p>
+                      <p className="text-xs text-conclave-muted mb-3 line-clamp-1">
+                        {p.description}
+                      </p>
                     )}
 
                     {totalVotes > 0 && (
                       <div className="mb-2">
                         <div className="flex justify-between text-[10px] mb-1">
-                          <span className="text-green-400 font-medium">Yes {yesPercent}%</span>
-                          <span className="text-red-400 font-medium">No {100 - yesPercent}%</span>
+                          <span className="text-green-400 font-medium">
+                            Yes {yesPercent}%
+                          </span>
+                          <span className="text-red-400 font-medium">
+                            No {100 - yesPercent}%
+                          </span>
                         </div>
                         <div className="h-1.5 bg-conclave-dark rounded-full overflow-hidden">
                           <div
@@ -858,21 +1172,41 @@ function ProposalsList({ roomPda, realmAddress }: { roomPda: string; realmAddres
                             style={{ width: `${yesPercent}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-conclave-muted mt-1">{totalVotes} votes</p>
+                        <p className="text-[10px] text-conclave-muted mt-1">
+                          {totalVotes} votes
+                        </p>
                       </div>
                     )}
 
                     <div className="flex items-center justify-between text-[10px] text-conclave-muted">
-                      <span>{new Date(p.deadline * 1000).toLocaleString()}</span>
+                      <span>
+                        {new Date(p.deadline * 1000).toLocaleString()}
+                      </span>
                       {!deadlinePassed && (
-                        <span className="text-conclave-accent font-medium">{formatTimeLeft(p.deadline)}</span>
+                        <span className="text-conclave-accent font-medium">
+                          {formatTimeLeft(p.deadline)}
+                        </span>
                       )}
                       {deadlinePassed && !p.isFinalized && (
-                        <span className="text-yellow-400 font-medium">Awaiting reveals</span>
+                        <span className="text-yellow-400 font-medium">
+                          Awaiting reveals
+                        </span>
                       )}
                       {p.isFinalized && totalVotes > 0 && (
-                        <span className={`font-bold ${p.voteYesCount > p.voteNoCount ? "text-green-400" : p.voteNoCount > p.voteYesCount ? "text-red-400" : "text-yellow-400"}`}>
-                          {p.voteYesCount > p.voteNoCount ? "PASSED" : p.voteNoCount > p.voteYesCount ? "REJECTED" : "TIED"}
+                        <span
+                          className={`font-bold ${
+                            p.voteYesCount > p.voteNoCount
+                              ? "text-green-400"
+                              : p.voteNoCount > p.voteYesCount
+                              ? "text-red-400"
+                              : "text-yellow-400"
+                          }`}
+                        >
+                          {p.voteYesCount > p.voteNoCount
+                            ? "PASSED"
+                            : p.voteNoCount > p.voteYesCount
+                            ? "REJECTED"
+                            : "TIED"}
                         </span>
                       )}
                     </div>
@@ -892,7 +1226,10 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
   const { connection } = useConnection();
   const [inviteeAddress, setInviteeAddress] = useState("");
   const [sending, setSending] = useState(false);
-  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [status, setStatus] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [tokenBalance, setTokenBalance] = useState<number | null>(null);
 
   // Fetch creator's token balance
@@ -909,7 +1246,9 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
         if (!cancelled) setTokenBalance(0);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [wallet, governanceMint, connection, sending]);
 
   const handleSendInvite = async () => {
@@ -935,19 +1274,12 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
             inviteeAta,
             inviteePubkey,
             mint,
-          )
+          ),
         );
       }
 
       // Transfer 1 token
-      tx.add(
-        createTransferInstruction(
-          creatorAta,
-          inviteeAta,
-          wallet,
-          1,
-        )
-      );
+      tx.add(createTransferInstruction(creatorAta, inviteeAta, wallet, 1));
 
       const { blockhash } = await connection.getLatestBlockhash();
       tx.recentBlockhash = blockhash;
@@ -956,7 +1288,10 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
       const sig = await sendTransaction(tx, connection);
       await connection.confirmTransaction(sig, "confirmed");
 
-      setStatus({ type: "success", message: `Sent 1 token to ${inviteePubkey.toBase58().slice(0, 8)}...` });
+      setStatus({
+        type: "success",
+        message: `Sent 1 token to ${inviteePubkey.toBase58().slice(0, 8)}...`,
+      });
       setInviteeAddress("");
     } catch (err: any) {
       setStatus({ type: "error", message: err?.message || "Transfer failed" });
@@ -995,7 +1330,11 @@ function InviteSection({ governanceMint }: { governanceMint: string }) {
       </div>
 
       {status && (
-        <p className={`text-sm mt-2 ${status.type === "success" ? "text-green-400" : "text-red-400"}`}>
+        <p
+          className={`text-sm mt-2 ${
+            status.type === "success" ? "text-green-400" : "text-red-400"
+          }`}
+        >
           {status.message}
         </p>
       )}
