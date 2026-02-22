@@ -64,6 +64,27 @@ Voting is **commit–reveal**: you submit a commitment first, then reveal your c
 - **Sync from chain** — Polls the Conclave program and fills SQLite in FK-safe order; supports single-room fetch so the group key can be stored right after create.
 - **Run locally** — `cd conclave/indexer && npm run dev` (default port 3001). The app needs it for room list, messages, and join (room key).
 
+### Developer tooling & extras
+
+- **PWA (installable app)** — Add to Home Screen on mobile or desktop for an app-like experience. Manifest and theme are included.
+- **`conclave-sdk` (NPM package)** — Dev toolkit in `conclave/packages/conclave-sdk`: indexer API client, PDAs (room, member, proposal, treasury, etc.), and TypeScript types. Use it to build bots, dashboards, or Realms extensions that read Conclave data. See `conclave/packages/conclave-sdk/README.md`.
+
+---
+
+## Hackathon — Realms DAO track
+
+**Conclave** is built for the **Solana Graveyard Hackathon — Realms** track. We target **Governance Builders** (tooling and governance systems on Realms) and **Realms Extensions** (integrations that expand Realms orgs).
+
+Conclave extends Realms with **private voting** (commit–reveal and quadratic), **encrypted discussion**, and optional **ZK proof of membership**. Rooms can be linked to a Realms realm and surface its proposals in-app; membership is verified via Realms TokenOwnerRecord.
+
+**Quick run for judges (devnet):**
+
+1. **Run indexer + app** — Terminal 1: `cd conclave && npm run dev`. Terminal 2: `cd conclave/indexer && npm run dev`.
+2. **Connect wallet** — Open [http://localhost:3000](http://localhost:3000), connect a devnet wallet (e.g. Phantom).
+3. **Create a room** — “Create Room” → choose “Realms DAO”, then either link an existing realm address or “Create new Realm” to deploy a DAO and use its community mint.
+4. **Join, propose, vote** — Join the room (prove token ownership), open “Proposals” → “Create proposal”, cast a commit vote, and after the deadline reveal and finalize.
+5. **Treasury** — Room authority: “Treasury” tab → init treasury, fund with SOL, and after a proposal passes, execute a transfer.
+
 ---
 
 ## Tech Stack
@@ -83,6 +104,7 @@ Voting is **commit–reveal**: you submit a commitment first, then reveal your c
 Conclave/
 ├── README.md                 # This file
 └── conclave/
+    ├── packages/conclave-sdk # NPM package: API client, PDAs, types (dev tooling)
     ├── programs/conclave/    # Anchor program (Rust)
     │   └── src/
     │       ├── lib.rs
@@ -96,6 +118,7 @@ Conclave/
     ├── lib/                  # API client, conclave PDAs, IDL
     ├── pages/                # Next.js pages (home, rooms list, create room, room detail [chat | proposals | members | treasury | realms])
     ├── indexer/              # Node indexer + REST API
+    ├── public/manifest.json   # PWA manifest (installable app)
     ├── target/idl/           # Generated IDL (anchor build)
     └── FLOW.md               # Detailed flow: create room, join, key publish, messages
 ```
