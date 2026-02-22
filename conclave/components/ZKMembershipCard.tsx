@@ -48,6 +48,9 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [verifyPaste, setVerifyPaste] = useState("");
+  const [verifyResult, setVerifyResult] = useState<"idle" | "valid" | "invalid" | "error">("idle");
+  const [verifyLoading, setVerifyLoading] = useState(false);
 
   // Load existing identity from localStorage on mount
   useEffect(() => {
@@ -196,6 +199,42 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
     setError("");
     setStatus("");
   };
+
+  const handleVerifyProof = useCallback(async () => {
+    if (!verifyPaste.trim()) {
+      setVerifyResult("error");
+      return;
+    }
+    setVerifyLoading(true);
+    setVerifyResult("idle");
+    try {
+      const payload = JSON.parse(verifyPaste.trim()) as {
+        roomPda?: string;
+        merkleTreeRoot: string;
+        nullifierHash: string;
+        externalNullifier: string;
+        signal?: string;
+        proof: string[];
+      };
+      const { verifyProof: semaphoreVerify } = await import("@semaphore-protocol/proof");
+      const proofArr = Array.isArray(payload.proof) && payload.proof.length >= 8
+        ? (payload.proof.slice(0, 8) as [string, string, string, string, string, string, string, string])
+        : payload.proof;
+      const fullProof = {
+        merkleTreeRoot: BigInt(payload.merkleTreeRoot),
+        nullifierHash: BigInt(payload.nullifierHash),
+        externalNullifier: BigInt(payload.externalNullifier),
+        signal: payload.signal ?? "1",
+        proof: proofArr,
+      };
+      const valid = await semaphoreVerify(fullProof as import("@semaphore-protocol/proof").SemaphoreProof, TREE_DEPTH);
+      setVerifyResult(valid ? "valid" : "invalid");
+    } catch {
+      setVerifyResult("error");
+    } finally {
+      setVerifyLoading(false);
+    }
+  }, [verifyPaste]);
 
   return (
     <div className="space-y-4">
@@ -370,10 +409,31 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
               </div>
             </div>
 
+            <p className="text-[10px] text-conclave-muted">
+              Share the proof JSON below so anyone can verify you are in this room’s ZK group (without revealing who you are).
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                const payload = {
+                  roomPda,
+                  merkleTreeRoot: proofDisplay.merkleTreeRoot,
+                  nullifierHash: proofDisplay.nullifierHash,
+                  externalNullifier: proofDisplay.externalNullifier,
+                  signal: "1",
+                  proof: proofDisplay.proof,
+                };
+                navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+              }}
+              className="text-xs text-violet-400 hover:underline"
+            >
+              Copy proof for verification
+            </button>
+
             <button
               onClick={handleProve}
               disabled={loading}
-              className="text-xs text-violet-400 hover:underline disabled:opacity-50"
+              className="text-xs text-violet-400 hover:underline disabled:opacity-50 ml-3"
             >
               Regenerate proof
             </button>
@@ -393,6 +453,43 @@ export default function ZKMembershipCard({ roomPda, isMember }: Props) {
       {error && (
         <p className="text-red-400 text-sm">{error}</p>
       )}
+
+      {/* Verify a proof (anyone can do this) */}
+      <div className="rounded-xl border border-conclave-border/50 bg-conclave-dark/30 p-4">
+        <h4 className="text-sm font-medium text-white mb-2">Verify a proof</h4>
+        <p className="text-xs text-conclave-muted mb-2">
+          Paste a proof JSON (from &quot;Copy proof for verification&quot;) to verify that someone is in this room&apos;s ZK group — without learning who they are.
+        </p>
+        <textarea
+          value={verifyPaste}
+          onChange={(e) => {
+            setVerifyPaste(e.target.value);
+            setVerifyResult("idle");
+          }}
+          placeholder='{"roomPda":"...","merkleTreeRoot":"...","nullifierHash":"...","externalNullifier":"...","signal":"1","proof":[...]}'
+          className="w-full rounded-lg border border-conclave-border bg-conclave-dark px-3 py-2 text-white placeholder-conclave-muted focus:border-conclave-accent focus:outline-none text-xs font-mono h-24"
+          spellCheck={false}
+        />
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            type="button"
+            onClick={handleVerifyProof}
+            disabled={verifyLoading || !verifyPaste.trim()}
+            className="btn-primary text-sm disabled:opacity-50"
+          >
+            {verifyLoading ? "Verifying…" : "Verify proof"}
+          </button>
+          {verifyResult === "valid" && (
+            <span className="text-xs text-green-400 font-medium">✓ Proof valid — prover is in this room&apos;s ZK group.</span>
+          )}
+          {verifyResult === "invalid" && (
+            <span className="text-xs text-red-400 font-medium">Proof invalid.</span>
+          )}
+          {verifyResult === "error" && (
+            <span className="text-xs text-red-400 font-medium">Invalid JSON or verification failed.</span>
+          )}
+        </div>
+      </div>
 
       {/* How it works */}
       <details className="rounded-xl border border-conclave-border/30 p-4">

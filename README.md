@@ -54,6 +54,10 @@ Voting is **commit–reveal**: you submit a commitment first, then reveal your c
 - **Link room to a realm** — Optional: associate a room with a [Realms](https://realms.today) realm (by realm address).
 - **Realm proposals** — View and link to realm proposals from inside the room; verify membership via Realms TokenOwnerRecord.
 
+### ZK Proof of Membership
+
+- **Prove “I hold the governance token” without revealing which wallet** — Room members can register an anonymous Semaphore identity (commitment) and generate a **Groth16 ZK proof** that their commitment is a leaf in the room’s Poseidon Merkle tree. Verifiers get a cryptographic guarantee that the prover is in the token-gated group, with no link to wallet or leaf index. Verification is real (Semaphore + PSE trusted setup); the app supports “Copy proof” and “Verify a proof” so anyone can check validity. This is a core fit for Conclave’s anonymous privacy governance: eligibility is proven, identity stays private. See **conclave/ZK_MEMBERSHIP.md** for the full flow and why it’s relevant to the use case.
+
 ### Indexer (backend)
 
 - **REST API** — Rooms, members, messages, proposals, vote commitments, group keys (for join flow).
