@@ -1,0 +1,37 @@
+{
+  "name": "conclave-sdk",
+  "version": "0.1.0",
+  "description": "Dev toolkit for Conclave — rooms, proposals, PDAs, and indexer API. Build DAO tooling and Realms extensions on Solana.",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "conclave",
+    "solana",
+    "dao",
+    "realms",
+    "governance",
+    "sdk"
+  ],
+  "license": "ISC",
+  "peerDependencies": {
+    "@solana/web3.js": "^1.90.0"
+  },
+  "devDependencies": {
+    "@solana/web3.js": "^1.95.3",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3"
+  }
+}
