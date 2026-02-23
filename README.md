@@ -1,100 +1,330 @@
-# Conclave — Anonymous DAO Workspace
+# Conclave — The Privacy Layer for Solana DAOs
 
-**Where your vote speaks louder than your identity.**
+> **Every DAO tool today has one critical flaw: your vote is public before it closes.**
+> Conclave fixes this — commit–reveal voting, end-to-end encrypted chat, quadratic governance,
+> and ZK proof of membership. Drop-in privacy for any Realms DAO.
 
-Private voting. Encrypted chat. Zero surveillance. Built on Solana with optional [Realms](https://realms.today) integration.
-
----
-
-## What is Conclave?
-
-Conclave is a **governance and collaboration app** for token-holder communities (DAOs). Members join **rooms** gated by a governance token, then:
-
-- **Chat** in end-to-end encrypted group messages
-- **Create and vote** on proposals (simple yes/no or quadratic voting)
-- **Fund and manage** a room **treasury** (SOL)
-- **Execute** approved proposals that transfer SOL from the treasury
-- Optionally **link to a Realms realm** and surface realm proposals in the room
-
-Voting is **commit–reveal**: you submit a commitment first, then reveal your choice after the deadline, so votes stay private until tallying.
+[![Solana](https://img.shields.io/badge/Solana-Devnet%20%2F%20Mainnet--ready-9945FF?logo=solana)](https://solana.com)
+[![Anchor](https://img.shields.io/badge/Anchor-0.32.1-blue)](https://www.anchor-lang.com)
+[![License](https://img.shields.io/badge/license-ISC-green)](LICENSE)
+[![npm](https://img.shields.io/badge/npm-conclave--sdk-CB3837?logo=npm)](https://www.npmjs.com/package/conclave-sdk)
 
 ---
 
-## Features & Functionality
+## The Problem
 
-### Rooms
+| DAO Tool | What breaks |
+|---|---|
+| Realms | Votes public while open → whale-watching, last-second flips, voter suppression |
+| Snapshot | Off-chain, not enforceable, no chat privacy |
+| Tally | Fully transparent, no privacy primitive |
+| Discord/Telegram | Zero on-chain accountability, no privacy |
 
-- **Create a room** — Name + governance token mint (any SPL token). Only holders of that token can join.
-- **Join a room** — Prove token ownership; receive the room’s encrypted group key (from the indexer or, for the creator, from the browser).
-- **Room authority** — The creator can initialize the treasury, and (if indexer was down at create time) publish the room key so others can join.
+**Real consequences:**
+- Members see a whale voting Yes → they pile in (herding)
+- Founders can identify who voted against them
+- Sensitive budget discussions happen in DMs because on-chain chat is public
+- Small holders don't vote because their wallet reveals their identity
+
+---
+
+## The Solution
+
+```
+Realms DAO  +  Conclave  =  Private Governance
+```
+
+Conclave is a **privacy coordination layer** that sits on top of any token-gated community.
+It does not replace Realms — it adds what Realms can't: **private deliberation and secret ballots**.
+
+---
+
+## Architecture
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         CONCLAVE — SYSTEM ARCHITECTURE                      ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                          CLIENT (Browser / PWA)                          │
+  │                                                                          │
+  │   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌─────────┐  │
+  │   │  Chat    │  │ Proposals│  │  Members │  │ Treasury │  │ Realms  │  │
+  │   │  Room    │  │  & Vote  │  │  + ZK    │  │  Mgmt    │  │  Link   │  │
+  │   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬────┘  │
+  │        │              │              │              │              │       │
+  │   ┌────▼──────────────▼──────────────▼──────────────▼──────────────▼───┐ │
+  │   │                   PRIVACY LAYER (browser-side, no server touch)     │ │
+  │   │                                                                     │ │
+  │   │  ┌─────────────────────┐    ┌─────────────────────────────────────┐ │ │
+  │   │  │   ENCRYPTION        │    │   VOTING COMMITMENT                 │ │ │
+  │   │  │                     │    │                                     │ │ │
+  │   │  │  TweetNaCl (NaCl)   │    │  Standard:                         │ │ │
+  │   │  │  X25519 key deriv.  │    │    commitment = sha256(choice‖nonce) │ │ │
+  │   │  │  secretbox (XSalsa) │    │                                     │ │ │
+  │   │  │  Group key per room │    │  Quadratic:                        │ │ │
+  │   │  │  Enc per member     │    │    commitment =                     │ │ │
+  │   │  │  (box/unbox)        │    │    sha256(count_le4‖choice‖nonce)   │ │ │
+  │   │  └─────────────────────┘    └─────────────────────────────────────┘ │ │
+  │   │                                                                     │ │
+  │   │  ┌─────────────────────┐    ┌─────────────────────────────────────┐ │ │
+  │   │  │   ZK MEMBERSHIP     │    │   SESSION KEYS (Gasless)            │ │ │
+  │   │  │                     │    │                                     │ │ │
+  │   │  │  Semaphore identity │    │  Ephemeral keypair (no wallet)      │ │ │
+  │   │  │  Poseidon Merkle    │    │  session_key signs messages         │ │ │
+  │   │  │  Groth16 proof      │    │  Expires at timestamp               │ │ │
+  │   │  │  Prove membership   │    │  Relayer broadcasts                 │ │ │
+  │   │  │  without wallet     │    │  (unlinks wallet from message)      │ │ │
+  │   │  └─────────────────────┘    └─────────────────────────────────────┘ │ │
+  │   └─────────────────────────────────────────────────────────────────────┘ │
+  └──────────────────────────────┬──────────────────────────────────────────┘
+                                 │  signed transactions
+                                 ▼
+  ╔══════════════════════════════════════════════════════════════════════════╗
+  ║                    CONCLAVE ANCHOR PROGRAM (Solana)                      ║
+  ║                    Program ID: E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU ║
+  ╠══════════════════════════════════════════════════════════════════════════╣
+  ║                                                                          ║
+  ║  ACCOUNTS (PDAs)                         INSTRUCTIONS (16)              ║
+  ║  ───────────────────────────────         ─────────────────────────────  ║
+  ║  DaoRoom   ["room", auth, name]          create_room                    ║
+  ║    ├── authority: Pubkey                 join_room                      ║
+  ║    ├── governance_mint: Pubkey           ─────────────────────────────  ║
+  ║    ├── name: String                      create_proposal                ║
+  ║    └── member_count / proposal_count     cast_vote                      ║
+  ║                                          reveal_vote                    ║
+  ║  Member    ["member", room, wallet]      reveal_quadratic_vote          ║
+  ║    ├── wallet: Pubkey                    finalize_proposal              ║
+  ║    └── encrypted_group_key: [u8]         ─────────────────────────────  ║
+  ║                                          send_message                   ║
+  ║  Message   ["message", room, sender, ts] send_message_with_session      ║
+  ║    └── ciphertext: Vec<u8>  (on-chain)   close_message                  ║
+  ║                                          ─────────────────────────────  ║
+  ║  Proposal  ["proposal", room, title]     init_treasury                  ║
+  ║    ├── vote_mode: u8 (0=std, 1=quad)     fund_treasury                  ║
+  ║    └── total_credits: u32                execute_proposal_action        ║
+  ║                                          ─────────────────────────────  ║
+  ║  VoteCommitment ["vote", prop, voter]    create_session                 ║
+  ║    └── commitment: [u8; 32]              update_member_key              ║
+  ║                                          close_vote                     ║
+  ║  Session   ["session", room, owner]                                     ║
+  ║  Treasury  ["treasury", room]            EVENTS (11 emitted)            ║
+  ║                                          RoomCreated, MemberJoined      ║
+  ║  ERRORS: 31 custom error codes           ProposalCreated, VoteCast      ║
+  ║                                          VoteRevealed, MessageSent      ║
+  ║                                          ProposalFinalized              ║
+  ║                                          SessionCreated, TreasuryFunded ║
+  ║                                          ProposalActionExecuted         ║
+  ║                                          QuadraticVoteRevealed          ║
+  ╚══════════════════════════════════════════════════════════════════════════╝
+                 │ RPC (getProgramAccounts + logs)
+                 ▼
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                     INDEXER  (Node.js + Express + SQLite)                │
+  │                     Deployed: Vercel (serverless + cron sync)            │
+  │                                                                          │
+  │  Tables: rooms · members · messages · proposals · vote_commitments       │
+  │          events · group_keys · vote_data                                 │
+  │                                                                          │
+  │  REST API Endpoints:                                                     │
+  │  GET  /rooms                      → all rooms                            │
+  │  GET  /rooms/:address             → room detail                          │
+  │  GET  /rooms/:address/messages    → paginated encrypted messages         │
+  │  GET  /rooms/:address/proposals   → proposal list                        │
+  │  GET  /rooms/:address/members     → member list                          │
+  │  GET  /proposals/:address         → proposal detail                      │
+  │  GET  /members/:wallet/rooms      → rooms wallet is member of            │
+  │  GET  /reputation/:wallet         → anonymous rep (votes+props+msgs)     │
+  │  GET  /reputation/batch?wallets=  → batch reputation                     │
+  │  GET  /health                     → health check                         │
+  └──────────────────────────────┬───────────────────────────────────────────┘
+                                 │
+                   ┌─────────────┴──────────────┐
+                   │                            │
+                   ▼                            ▼
+  ┌─────────────────────────┐   ┌──────────────────────────────────────────┐
+  │   REALMS INTEGRATION    │   │   SOLANA ACTIONS / BLINKS                │
+  │                         │   │                                          │
+  │  SPL Governance SDK     │   │  GET  /api/actions/vote/[proposalPda]    │
+  │  Program ID (same on    │   │  POST /api/actions/vote/[proposalPda]    │
+  │  devnet + mainnet):     │   │                                          │
+  │  GovER5Lthms3bLBq...    │   │  Blink URL:                              │
+  │                         │   │  dial.to/?action=solana-action:          │
+  │  fetchRealmInfo()       │   │    <origin>/api/actions/vote/<id>        │
+  │  verifyMembership()     │   │                                          │
+  │  fetchRealmProposals()  │   │  Vote from: Twitter, Discord, Telegram,  │
+  │  getGovernanceMint()    │   │  any Solana-aware app or bot             │
+  │                         │   │                                          │
+  │  TokenOwnerRecord       │   │  Server builds cast_vote tx with         │
+  │  verification for       │   │  manual Anchor discriminator             │
+  │  token-gated join       │   │  sha256("global:cast_vote")[0..8]        │
+  └─────────────────────────┘   └──────────────────────────────────────────┘
+
+  ┌──────────────────────────────────────────────────────────────────────────┐
+  │                     DEVELOPER SDK (NPM)                                  │
+  │                     npm install conclave-sdk @solana/web3.js             │
+  │                                                                          │
+  │  packages/conclave-sdk/src/                                              │
+  │  ├── client.ts    ConclaveClient — wraps all instructions                │
+  │  ├── pdas.ts      getRoomPda, getMemberPda, getProposalPda, ...          │
+  │  ├── types.ts     TypeScript types for all accounts                      │
+  │  └── index.ts     re-exports                                             │
+  │                                                                          │
+  │  app/sdk/                                                                │
+  │  ├── crypto.ts    TweetNaCl group key, message encrypt/decrypt           │
+  │  ├── realms.ts    Realms SDK wrappers (fetchRealmInfo, etc.)             │
+  │  └── tapestry.ts  Social graph integration                               │
+  └──────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Why Conclave Wins Over Other DAO Tools
+
+| Feature | Snapshot | Realms | Tally | **Conclave** |
+|---|:---:|:---:|:---:|:---:|
+| On-chain enforcement | ✗ | ✓ | ✓ | ✓ |
+| Secret ballot (commit-reveal) | ✗ | ✗ | ✗ | ✓ |
+| Quadratic voting | ✗ | ✗ | ✗ | ✓ |
+| E2E encrypted group chat | ✗ | ✗ | ✗ | ✓ |
+| ZK proof of membership | ✗ | ✗ | ✗ | ✓ |
+| Gasless session keys | ✗ | ✗ | ✗ | ✓ |
+| Anonymous reputation | ✗ | ✗ | ✗ | ✓ |
+| Blinks (vote from anywhere) | ✗ | ✗ | ✗ | ✓ |
+| Realms integration | ✗ | native | ✗ | ✓ |
+| Open-source SDK on npm | ✗ | partial | ✗ | ✓ |
+| Treasury + proposal execution | ✗ | ✓ | ✓ | ✓ |
+
+---
+
+## Features
+
+### Rooms — Token-Gated Private Workspaces
+
+- Create a room with any SPL governance token mint
+- Only token holders can join (verified on-chain at `join_room`)
+- Optionally link a room to an existing Realms realm
+- Room authority manages treasury and proposal finalization
+- **Encrypted group key** distributed per member — messages unreadable without membership
 
 ### Encrypted Chat
 
-- **Group key** — Generated when the room is created; stored in the creator’s browser and sent to the indexer so new members can join.
-- **Messages** — Encrypted (e.g. NaCl secretbox) and stored on chain; decrypted in the app using the group key.
-- **Session keys (gasless)** — Optional: create a session key so a relayer or another device can send messages without the main wallet signing every time.
+- Messages encrypted with **NaCl secretbox** (XSalsa20-Poly1305) before broadcast
+- Ciphertext stored on-chain in `Message` accounts — raw chain data is opaque
+- Group key encrypted separately for each member using **X25519 Diffie-Hellman** (derived from Solana Ed25519 keypair)
+- **Session keys** for gasless messaging — ephemeral keypair, no wallet needed per message, relayer broadcasts
 
-### Proposals & Voting
+### Commit–Reveal Voting
 
-- **Create proposal** — Title, description, deadline, and **vote mode**:
-  - **Simple** (0): one vote per member (yes/no).
-  - **Quadratic** (1): credits are spread across options; total credits configurable per proposal.
-- **Cast vote** — Submit a **commitment** (hash of your choice + nonce) so your vote is hidden until reveal.
-- **Reveal vote** — After the deadline, reveal your choice and nonce; the program checks the hash and tallies.
-- **Finalize** — Room authority finalizes the proposal so results are fixed and (if applicable) execution can happen.
+```
+Phase 1 (COMMIT):  commitment = sha256(choice ‖ nonce)  → stored on-chain
+Phase 2 (REVEAL):  voter submits choice + nonce         → program verifies sha256
+                   program tallies after deadline passes
+```
+
+- Nobody can see vote choices until all votes are revealed
+- Prevents whale-watching, last-second flips, voter coercion
+- Nonce stored locally — only you can reveal your vote
+
+### Quadratic Voting
+
+```
+vote_weight = sqrt(credits_spent)
+commitment  = sha256(vote_count_le_u32(4) ‖ vote_choice(1) ‖ nonce(32))
+```
+
+- Configurable voice credits per proposal
+- Diminishing returns on concentrated power
+- Same commit–reveal privacy guarantees apply
 
 ### Treasury
 
-- **Initialize treasury** — Room authority creates the treasury PDA for the room (once).
-- **Fund treasury** — Anyone can send SOL to the room treasury.
-- **Execute proposal action** — After a proposal is finalized and approved, the authority can execute a transfer of SOL from the treasury (e.g. to a grant recipient).
-
-### Realms Integration
-
-- **Link room to a realm** — Optional: associate a room with a [Realms](https://realms.today) realm (by realm address).
-- **Realm proposals** — View and link to realm proposals from inside the room; verify membership via Realms TokenOwnerRecord.
+- Treasury PDA: `["treasury", room]` — holds SOL
+- Fund by anyone; execute by authority after proposal passes + is finalized
+- On-chain transfer enforcement — no multisig needed, proposal is the authority
 
 ### ZK Proof of Membership
 
-- **Prove “I hold the governance token” without revealing which wallet** — Room members can register an anonymous Semaphore identity (commitment) and generate a **Groth16 ZK proof** that their commitment is a leaf in the room’s Poseidon Merkle tree. Verifiers get a cryptographic guarantee that the prover is in the token-gated group, with no link to wallet or leaf index. Verification is real (Semaphore + PSE trusted setup); the app supports “Copy proof” and “Verify a proof” so anyone can check validity. This is a core fit for Conclave’s anonymous privacy governance: eligibility is proven, identity stays private. See **conclave/ZK_MEMBERSHIP.md** for the full flow and why it’s relevant to the use case.
+- **Semaphore identity** — anonymous nullifier derived from wallet
+- **Poseidon Merkle tree** — leaves are member identity commitments
+- **Groth16 proof** — proves "I am in this tree" without revealing which leaf or wallet
+- Verifiable by anyone; copy/paste proof in UI
+- Prevents double-spending / Sybil in anonymous governance contexts
 
-### Indexer (backend)
+### Realms Integration
 
-- **REST API** — Rooms, members, messages, proposals, vote commitments, group keys (for join flow).
-- **Sync from chain** — Polls the Conclave program and fills SQLite in FK-safe order; supports single-room fetch so the group key can be stored right after create.
-- **Run locally** — `cd conclave/indexer && npm run dev` (default port 3001). The app needs it for room list, messages, and join (room key).
+- Link room to any Realms realm address
+- Verify membership via `TokenOwnerRecord` (no custom on-chain code needed)
+- Surface realm proposals inside the Conclave room UI
+- Use realm's community mint as room governance token
+- Works with mainnet and devnet Realms (same SPL Governance program ID)
 
-### Developer tooling & extras
+### Solana Actions / Blinks
 
-- **PWA (installable app)** — Add to Home Screen on mobile or desktop for an app-like experience. Manifest and theme are included.
-- **`conclave-sdk` (NPM package)** — Dev toolkit: indexer API client, PDAs (room, member, proposal, treasury, etc.), and TypeScript types. Use it to build bots, dashboards, or Realms extensions. **[npm](https://www.npmjs.com/package/conclave-sdk)** · `npm install conclave-sdk @solana/web3.js` · See `conclave/packages/conclave-sdk/README.md`.
+- `GET /api/actions/vote/[proposalPda]` — returns action metadata
+- `POST /api/actions/vote/[proposalPda]` — builds + returns `cast_vote` transaction
+- Share vote link → members vote from Twitter, Discord, any Blink-aware client
+- Nonce stored in indexer for later reveal
+
+### Anonymous Reputation
+
+- Off-chain, derived from indexer DB: `votes_cast + proposals_created + messages_sent`
+- Tiers: **bronze** (1–4), **silver** (5–9), **gold** (10+)
+- Wallet identity never revealed — reputation attached to room alias
+- Displayed as colored badges in member list and chat
 
 ---
 
-## Hackathon — Realms DAO track
+## Hackathon — Realms DAO Track
 
-**Conclave** is built for the **Solana Graveyard Hackathon — Realms** track. We target **Governance Builders** (tooling and governance systems on Realms) and **Realms Extensions** (integrations that expand Realms orgs).
+Built for the **Solana Graveyard Hackathon — Realms** track, targeting:
+- **Governance Builders** — tooling and governance systems on Realms
+- **Realms Extensions** — integrations that expand existing Realms orgs
 
-Conclave extends Realms with **private voting** (commit–reveal and quadratic), **encrypted discussion**, and optional **ZK proof of membership**. Rooms can be linked to a Realms realm and surface its proposals in-app; membership is verified via Realms TokenOwnerRecord.
+**Conclave's value to the Realms ecosystem:**
+1. Any existing Realms DAO can link a Conclave room in minutes
+2. Adds private voting layer without migrating or replacing their Realms setup
+3. Encrypted discussion space for the same token-holders
+4. SDK lets Realms developers build bots and dashboards on Conclave data
 
-**Quick run for judges (devnet):**
+**Quick run for judges (devnet, ~5 min):**
 
-1. **Run indexer + app** — Terminal 1: `cd conclave && npm run dev`. Terminal 2: `cd conclave/indexer && npm run dev`.
-2. **Connect wallet** — Open [http://localhost:3000](http://localhost:3000), connect a devnet wallet (e.g. Phantom).
-3. **Create a room** — “Create Room” → choose “Realms DAO”, then either link an existing realm address or “Create new Realm” to deploy a DAO and use its community mint.
-4. **Join, propose, vote** — Join the room (prove token ownership), open “Proposals” → “Create proposal”, cast a commit vote, and after the deadline reveal and finalize.
-5. **Treasury** — Room authority: “Treasury” tab → init treasury, fund with SOL, and after a proposal passes, execute a transfer.
+```bash
+# Terminal 1
+cd conclave && npm install && npm run dev
+
+# Terminal 2
+cd conclave/indexer && npm install && npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000):
+
+1. Connect a devnet wallet (Phantom)
+2. Create a room — optionally paste a Realms realm address
+3. Join with a second wallet (or use an existing governance token)
+4. Open **Chat** tab → send a message (observe: raw ciphertext on-chain)
+5. Open **Proposals** tab → create a quadratic proposal
+6. Commit vote from wallet 1 and wallet 2
+7. After deadline → Reveal votes → Finalize
+8. Open **Treasury** tab → init, fund, execute (if proposal passed)
+9. Open **Realms** tab → view linked realm proposals
 
 ---
 
 ## Tech Stack
 
-| Layer        | Tech |
-|-------------|------|
-| Chain       | Solana (Anchor program) |
-| Frontend    | Next.js, React, Tailwind, Solana wallet-adapter |
-| Crypto      | TweetNaCl (encryption, key derivation) |
-| Backend     | Node.js indexer (Express, better-sqlite3), optional Realms SDK |
+| Layer | Technology |
+|---|---|
+| Chain | Solana (Anchor 0.32.1, Rust 1.89) |
+| Frontend | Next.js 14, React 18, Tailwind CSS |
+| Wallet | @solana/wallet-adapter (Phantom, Solflare) |
+| Encryption | TweetNaCl (X25519, XSalsa20-Poly1305, SHA-256) |
+| ZK | Semaphore v3 + Groth16 (PSE trusted setup) |
+| Realms | @realms-today/spl-governance |
+| Backend | Node.js, Express, better-sqlite3 |
+| Indexer deploy | Vercel (serverless + cron) |
+| SDK | tsup (CJS + ESM), published to npm |
 
 ---
 
@@ -102,25 +332,64 @@ Conclave extends Realms with **private voting** (commit–reveal and quadratic),
 
 ```
 Conclave/
-├── README.md                 # This file
+├── README.md
 └── conclave/
-    ├── packages/conclave-sdk # NPM package: API client, PDAs, types (dev tooling)
-    ├── programs/conclave/    # Anchor program (Rust)
-    │   └── src/
-    │       ├── lib.rs
-    │       ├── instructions/ # create_room, join_room, create_proposal, cast_vote, reveal_vote, reveal_quadratic_vote, send_message, finalize_proposal, init_treasury, fund_treasury, execute_proposal_action, create_session, send_message_with_session, ...
-    │       ├── state/
-    │       ├── errors.rs
-    │       └── events.rs
-    ├── app/sdk/              # Crypto, Realms helpers
-    ├── components/           # ChatRoom, MemberList, TreasuryCard, RealmsGovernance, ...
-    ├── hooks/                # useConclaveProgram, useSessionKey
-    ├── lib/                  # API client, conclave PDAs, IDL
-    ├── pages/                # Next.js pages (home, rooms list, create room, room detail [chat | proposals | members | treasury | realms])
-    ├── indexer/              # Node indexer + REST API
-    ├── public/manifest.json   # PWA manifest (installable app)
-    ├── target/idl/           # Generated IDL (anchor build)
-    └── FLOW.md               # Detailed flow: create room, join, key publish, messages
+    ├── programs/conclave/src/
+    │   ├── lib.rs                          # 16 instructions declared
+    │   ├── instructions/
+    │   │   ├── create_room.rs
+    │   │   ├── join_room.rs
+    │   │   ├── create_proposal.rs
+    │   │   ├── cast_vote.rs
+    │   │   ├── reveal_vote.rs
+    │   │   ├── reveal_quadratic_vote.rs
+    │   │   ├── send_message.rs
+    │   │   ├── send_message_with_session.rs
+    │   │   ├── finalize_proposal.rs
+    │   │   ├── close_message.rs
+    │   │   ├── close_vote.rs
+    │   │   ├── update_member_key.rs
+    │   │   ├── create_session.rs
+    │   │   ├── init_treasury.rs
+    │   │   ├── fund_treasury.rs
+    │   │   └── execute_proposal_action.rs
+    │   ├── state/
+    │   │   ├── dao_room.rs
+    │   │   ├── member.rs
+    │   │   ├── message.rs
+    │   │   ├── proposal.rs       # vote_mode + total_credits
+    │   │   ├── session.rs
+    │   │   └── treasury.rs
+    │   ├── errors.rs             # 31 custom errors
+    │   └── events.rs             # 11 event types
+    ├── pages/
+    │   ├── index.tsx             # Landing
+    │   ├── rooms/
+    │   │   ├── index.tsx         # Room browser
+    │   │   ├── create.tsx        # Create room + Realms link
+    │   │   └── [roomPda].tsx     # Room detail (chat / proposals / members / treasury / realms)
+    │   │       └── proposals/
+    │   │           ├── create.tsx
+    │   │           └── [proposalPda].tsx
+    │   └── api/actions/vote/[proposalPda].ts   # Solana Blinks endpoint
+    ├── components/
+    │   ├── ChatRoom.tsx          # E2E encrypted chat UI
+    │   ├── MemberList.tsx        # Member list + reputation badges
+    │   ├── TreasuryCard.tsx      # Treasury init / fund / execute
+    │   ├── RealmsGovernance.tsx  # Realms realm info + proposals
+    │   └── ZKMembershipCard.tsx  # ZK proof generation + verification
+    ├── lib/
+    │   ├── conclave.ts           # PDA derivation + TypeScript interfaces
+    │   ├── api.ts                # Indexer REST client
+    │   └── anon.ts               # Semaphore identity + anonymous rep
+    ├── app/sdk/
+    │   ├── crypto.ts             # TweetNaCl group key, encrypt, vote commitments
+    │   ├── realms.ts             # Realms SDK wrappers
+    │   └── tapestry.ts           # Social graph integration
+    ├── packages/conclave-sdk/    # NPM package: ConclaveClient, PDAs, types
+    ├── indexer/                  # Node.js indexer + REST API + SQLite
+    ├── public/manifest.json      # PWA manifest
+    └── tests/                    # 25+ Anchor tests
 ```
 
 ---
@@ -130,119 +399,122 @@ Conclave/
 ### Prerequisites
 
 - Node.js 18+
-- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) (for deploy)
-- [Anchor](https://www.anchor-lang.com/docs/installation) (for build/deploy)
+- [Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools)
+- [Anchor 0.32.1](https://www.anchor-lang.com/docs/installation)
 
-### 1. Install dependencies
+### Install and run
 
 ```bash
 cd conclave
 npm install
 cd indexer && npm install && cd ..
+npm run dev:all      # starts Next.js (3000) + indexer (3001)
 ```
 
-### 2. Build the program
+### Build and deploy (devnet)
 
 ```bash
 anchor build
-```
-
-Copy the IDL into the frontend so the app sees all instructions (e.g. `init_treasury`, `fund_treasury`):
-
-```bash
 cp target/idl/conclave.json lib/idl/conclave.json
-```
-
-### 3. Configure cluster
-
-Set your Solana CLI to devnet (or mainnet) and ensure your wallet has SOL:
-
-```bash
-solana config set --url devnet
-solana airdrop 2
-```
-
-### 4. Deploy the program (optional; for a live app)
-
-```bash
+solana config set --url devnet && solana airdrop 2
 anchor deploy --provider.cluster devnet
 ```
 
-(Program ID is in `programs/conclave/src/lib.rs` and in the IDL; keep them in sync.)
-
-### 5. Run the app and indexer
-
-**Terminal 1 — Next.js:**
+### Create a test governance token
 
 ```bash
-cd conclave
-npm run dev
+spl-token create-token
+spl-token create-account <MINT>
+spl-token mint <MINT> 100
 ```
-
-**Terminal 2 — Indexer (required for room list, messages, join):**
-
-```bash
-cd conclave/indexer
-npm run dev
-```
-
-Or run both with:
-
-```bash
-cd conclave
-npm run dev:all
-```
-
-Open [http://localhost:3000](http://localhost:3000), connect a wallet, create or browse rooms.
-
-### 6. Create a room
-
-- **Room name** — Any (max 50 chars).
-- **Governance token mint** — SPL token mint address. Only wallets that hold ≥1 of this token can join. You can:
-  - Use a Realms DAO’s community mint,
-  - Use an existing SPL token, or
-  - Create a test token (e.g. `spl-token create-token`, then create account and mint).
-
-After create, the app auto-publishes the room key to the indexer (if it’s running) and auto-joins you.
 
 ---
 
-## Environment
+## Mainnet Deployment
 
-- **Frontend** — `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`) for the indexer base URL.
-- **Indexer** — `RPC_URL`, `WS_URL`, `PORT`, `DB_PATH` (default `conclave.db`).
+Conclave is mainnet-ready. Three environment changes:
 
-**Deploy indexer to Vercel:** From `conclave/indexer` run `npx vercel`. Set `RPC_URL` (and optionally `CRON_SECRET`) in the Vercel project, and add a cron job to hit `/cron/sync` so data stays updated. See **conclave/indexer/DEPLOY-VERCEL.md** for details and limitations (ephemeral DB, no real-time subscription).
+**1. Deploy program**
+```bash
+solana config set --url mainnet-beta
+anchor deploy --provider.cluster mainnet-beta
+# note new program ID
+```
+
+**2. Frontend `.env`**
+```
+NEXT_PUBLIC_RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+NEXT_PUBLIC_PROGRAM_ID=<NEW_MAINNET_PROGRAM_ID>
+NEXT_PUBLIC_SOLANA_CLUSTER=mainnet
+```
+
+**3. Indexer `indexer/.env`**
+```
+RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
+```
+
+> **Realms on mainnet:** No code changes needed. The SPL Governance program ID (`GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw`) is the same on mainnet and devnet. The `connection` follows your RPC automatically.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3001` | Indexer base URL |
+| `NEXT_PUBLIC_RPC_URL` | Solana devnet | RPC endpoint |
+| `NEXT_PUBLIC_PROGRAM_ID` | `E5HrS48...` | Conclave program ID |
+| `NEXT_PUBLIC_SOLANA_CLUSTER` | `devnet` | Used in Realms outbound links |
+| `RPC_URL` (indexer) | devnet | Indexer RPC endpoint |
+| `PORT` (indexer) | `3001` | Indexer port |
+| `DB_PATH` (indexer) | `conclave.db` | SQLite path |
 
 ---
 
 ## Flow Summary
 
-| Action              | Description |
-|---------------------|-------------|
-| Create room         | On-chain room + group key generated; key stored in browser and sent to indexer. |
-| Join room           | App gets key from indexer (or creator’s localStorage); `join_room` on chain. |
-| Send message        | Encrypted with group key; stored on chain; indexer serves to chat UI. |
-| Create proposal     | Title, description, deadline, vote mode (simple/quadratic), credits. |
-| Cast / reveal vote  | Commit then reveal; proposal finalized by authority. |
-| Init treasury       | Room authority once per room. |
-| Fund treasury       | Send SOL to room treasury. |
-| Execute proposal    | Authority executes approved proposal (e.g. transfer SOL from treasury). |
-
-See **conclave/FLOW.md** for detailed create/join/key-publish and message flow.
+| Step | What happens |
+|---|---|
+| Create room | DaoRoom PDA created; group key generated in browser; key posted to indexer |
+| Join room | App fetches group key from indexer; `join_room` verifies token ownership on-chain |
+| Send message | Plaintext encrypted with group key → ciphertext stored in Message PDA |
+| Decrypt messages | App fetches ciphertext from indexer; decrypts in browser with group key |
+| Create proposal | Proposal PDA with vote_mode + total_credits; deadline timestamp |
+| Cast vote | commitment = sha256(choice‖nonce) stored in VoteCommitment PDA |
+| Reveal vote | Voter submits choice + nonce; program verifies hash; tallies votes |
+| Finalize | Room authority finalizes; results locked |
+| Treasury execute | Authority transfers SOL from Treasury PDA to recipient |
+| Share Blink | `dial.to/?action=solana-action:<origin>/api/actions/vote/<id>` |
 
 ---
 
-## Future / Roadmap (not implemented yet)
+## Conclave SDK
 
-Planned for a later release:
+Build on top of Conclave:
 
-**AI agents as delegates** — A DAO where voting power isn’t human wallets alone: **AI agents** act as delegates for specific roles (e.g. proposer, analyst, moderator). Agents can generate proposals from observed network metrics or trend anomalies and call for budget releases.
+```bash
+npm install conclave-sdk @solana/web3.js
+```
 
-- **Innovative angle:** Agents have governance roles proportional to on-chain accomplishments; they can earn “delegate reputation tokens” that weight their proposals. Humans oversee agent proposals with veto power only when safety is at risk.
-- **Applications:** Community moderation systems; on-chain treasury allocation for autonomous task forces; automated grants for AI research.
+```typescript
+import { ConclaveClient, getRoomPda } from "conclave-sdk";
 
-*This is a future roadmap item and is not part of the current hackathon submission.*
+const client = new ConclaveClient(connection, wallet);
+const roomPda = getRoomPda(wallet.publicKey, "my-dao");
+await client.createRoom("my-dao", governanceMint);
+```
+
+[npm](https://www.npmjs.com/package/conclave-sdk) · [Source](conclave/packages/conclave-sdk/)
+
+---
+
+## Future Roadmap
+
+**AI agents as DAO delegates** — Autonomous agents that hold governance roles proportional to on-chain contributions. Agents propose budget releases from observed metrics; humans retain veto power. Delegate reputation tokens weight agent proposals.
+
+**Full ZK vote tallying** — Replace commit-reveal with fully homomorphic or ZK-based tally so even the tallier learns nothing until finalization.
+
+**Cross-DAO reputation** — Anonymous reputation (bronze/silver/gold) portable across Conclave rooms without linking wallets.
 
 ---
 
