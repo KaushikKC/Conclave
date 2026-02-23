@@ -212,6 +212,8 @@ After create, the app auto-publishes the room key to the indexer (if it’s runn
 - **Frontend** — `NEXT_PUBLIC_API_URL` (default `http://localhost:3001`) for the indexer base URL.
 - **Indexer** — `RPC_URL`, `WS_URL`, `PORT`, `DB_PATH` (default `conclave.db`).
 
+**Deploy indexer to Vercel:** From `conclave/indexer` run `npx vercel`. Set `RPC_URL` (and optionally `CRON_SECRET`) in the Vercel project, and add a cron job to hit `/cron/sync` so data stays updated. See **conclave/indexer/DEPLOY-VERCEL.md** for details and limitations (ephemeral DB, no real-time subscription).
+
 ---
 
 ## Flow Summary

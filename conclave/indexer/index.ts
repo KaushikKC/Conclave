@@ -13,7 +13,9 @@ const PROGRAM_ID = new PublicKey(
 const RPC_URL = process.env.RPC_URL || "https://api.devnet.solana.com";
 const WS_URL = process.env.WS_URL || "wss://api.devnet.solana.com";
 const PORT = parseInt(process.env.PORT || "3001");
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "conclave.db");
+const DB_PATH = process.env.VERCEL
+  ? "/tmp/conclave.db"
+  : process.env.DB_PATH || path.join(__dirname, "conclave.db");
 
 // --- Database Setup ---
 
@@ -793,6 +795,24 @@ app.get("/zk/group/:roomPda", (req, res) => {
   });
 });
 
+// GET /cron/sync — run full re-index (for Vercel Cron). Requires CRON_SECRET in query or Authorization header.
+app.get("/cron/sync", async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  const provided =
+    (req.query.secret as string) ||
+    (req.headers.authorization?.replace(/^Bearer\s+/i, "") ?? "");
+  if (secret && provided !== secret) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  try {
+    await indexAllAccounts();
+    res.json({ ok: true, message: "Index sync complete" });
+  } catch (err: any) {
+    console.error("Cron sync error:", err);
+    res.status(500).json({ error: err?.message ?? "Sync failed" });
+  }
+});
+
 // --- Start ---
 
 async function main() {
@@ -816,7 +836,14 @@ async function main() {
     console.log(`  GET /members/:wallet/rooms`);
     console.log(`  GET /events`);
     console.log(`  GET /health`);
+    console.log(`  GET /cron/sync (Vercel Cron)`);
   });
 }
 
-main().catch(console.error);
+// Export app for Vercel serverless; only run long-lived server when not on Vercel
+if (typeof module !== "undefined" && module.exports) {
+  (module as any).exports = { app };
+}
+if (!process.env.VERCEL) {
+  main().catch(console.error);
+}

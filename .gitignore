@@ -1,1 +1,3 @@
 .claude
+# Indexer build (Vercel builds on deploy)
+conclave/indexer/index.js
