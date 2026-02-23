@@ -16,8 +16,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="fixed top-0 left-0 right-0 h-px bg-white/10 z-[60]"></div>
 
       <header className="fixed top-0 left-0 right-0 z-50 h-20 bg-conclave-dark border-b border-white/10">
-        {/* Container for the main nav bar */}
-        <div className="max-w-7xl mx-auto h-full border-x border-white/10 grid grid-cols-[100px_1fr_100px] md:grid-cols-[140px_1fr_140px] relative">
+        {/* Container for the main nav bar - narrower side columns on mobile when connected so HOME/ROOMS/CREATE fit */}
+        <div
+          className={`max-w-7xl mx-auto h-full border-x border-white/10 grid relative ${
+            connected
+              ? "grid-cols-[64px_1fr_64px] md:grid-cols-[140px_1fr_140px]"
+              : "grid-cols-[100px_1fr_100px] md:grid-cols-[140px_1fr_140px]"
+          }`}
+        >
           {/* Left: Logo */}
           <div className="border-r border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors group cursor-pointer bg-conclave-dark relative z-20">
             <Link
@@ -32,29 +38,35 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {/* Center: Navigation */}
-          <nav className="flex items-center justify-center gap-4 md:gap-8 h-full px-4 md:px-8 relative overflow-hidden bg-conclave-dark">
+          {/* Center: Navigation - tighter spacing on mobile when 3 items (connected) */}
+          <nav
+            className={`flex items-center justify-center h-full relative overflow-hidden bg-conclave-dark shrink-0 ${
+              connected
+                ? "gap-2 px-2 md:gap-8 md:px-8"
+                : "gap-4 px-4 md:gap-8 md:px-8"
+            }`}
+          >
             <Link
               href="/"
-              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.15em] md:tracking-[0.2em] hover:text-white transition-colors relative group whitespace-nowrap shrink-0"
             >
               HOME
               <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-pink scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
-            <span className="text-conclave-green/50 text-[8px]">•</span>
+            <span className="text-conclave-green/50 text-[8px] shrink-0">•</span>
             <Link
               href="/rooms"
-              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+              className="nav-link text-[10px] md:text-xs font-bold tracking-[0.15em] md:tracking-[0.2em] hover:text-white transition-colors relative group whitespace-nowrap shrink-0"
             >
               ROOMS
               <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-yellow scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>
             </Link>
             {connected && (
               <>
-                <span className="text-conclave-yellow/50 text-[8px]">•</span>
+                <span className="text-conclave-yellow/50 text-[8px] shrink-0">•</span>
                 <Link
                   href="/rooms/create"
-                  className="nav-link text-[10px] md:text-xs font-bold tracking-[0.2em] hover:text-white transition-colors relative group"
+                  className="nav-link text-[10px] md:text-xs font-bold tracking-[0.15em] md:tracking-[0.2em] hover:text-white transition-colors relative group whitespace-nowrap shrink-0"
                 >
                   CREATE
                   <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-conclave-blue scale-x-0 group-hover:scale-x-100 transition-transform origin-left"></span>

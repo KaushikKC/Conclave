@@ -67,7 +67,7 @@ Voting is **commit–reveal**: you submit a commitment first, then reveal your c
 ### Developer tooling & extras
 
 - **PWA (installable app)** — Add to Home Screen on mobile or desktop for an app-like experience. Manifest and theme are included.
-- **`conclave-sdk` (NPM package)** — Dev toolkit in `conclave/packages/conclave-sdk`: indexer API client, PDAs (room, member, proposal, treasury, etc.), and TypeScript types. Use it to build bots, dashboards, or Realms extensions that read Conclave data. See `conclave/packages/conclave-sdk/README.md`.
+- **`conclave-sdk` (NPM package)** — Dev toolkit: indexer API client, PDAs (room, member, proposal, treasury, etc.), and TypeScript types. Use it to build bots, dashboards, or Realms extensions. **[npm](https://www.npmjs.com/package/conclave-sdk)** · `npm install conclave-sdk @solana/web3.js` · See `conclave/packages/conclave-sdk/README.md`.
 
 ---
 
