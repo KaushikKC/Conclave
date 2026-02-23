@@ -6,6 +6,11 @@ node_modules
 test-ledger
 .yarn
 
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
 # Next.js
 .next
 out
