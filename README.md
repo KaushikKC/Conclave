@@ -231,6 +231,19 @@ See **conclave/FLOW.md** for detailed create/join/key-publish and message flow.
 
 ---
 
+## Future / Roadmap (not implemented yet)
+
+Planned for a later release:
+
+**AI agents as delegates** — A DAO where voting power isn’t human wallets alone: **AI agents** act as delegates for specific roles (e.g. proposer, analyst, moderator). Agents can generate proposals from observed network metrics or trend anomalies and call for budget releases.
+
+- **Innovative angle:** Agents have governance roles proportional to on-chain accomplishments; they can earn “delegate reputation tokens” that weight their proposals. Humans oversee agent proposals with veto power only when safety is at risk.
+- **Applications:** Community moderation systems; on-chain treasury allocation for autonomous task forces; automated grants for AI research.
+
+*This is a future roadmap item and is not part of the current hackathon submission.*
+
+---
+
 ## License
 
 ISC.

@@ -5,9 +5,13 @@ export default function Document() {
     <Html lang="en">
       <Head>
         <title>Conclave</title>
-        <meta name="description" content="Private voting for DAOs on Solana" />
+        <meta name="description" content="Private voting for DAOs on Solana. Encrypted chat, commit-reveal voting, Realms integration." />
+        <meta name="theme-color" content="#FF4D8D" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <link rel="icon" href="/conclave-logo.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/conclave-logo.svg" />
+        <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

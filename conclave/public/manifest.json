@@ -1,0 +1,18 @@
+{
+  "name": "Conclave — Anonymous DAO Workspace",
+  "short_name": "Conclave",
+  "description": "Private voting. Encrypted chat. Zero surveillance. Built on Solana with Realms.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d0d",
+  "theme_color": "#FF4D8D",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/conclave-logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
