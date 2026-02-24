@@ -22,7 +22,7 @@ const PROGRAM_ID = new PublicKey(
   process.env.NEXT_PUBLIC_PROGRAM_ID ?? "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU"
 );
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.mainnet-beta.solana.com";
-const INDEXER_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const INDEXER_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001").replace(/\/$/, "");
 
 // Mainnet chain ID: 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d
 // Devnet chain ID:  EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG
