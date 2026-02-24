@@ -120,16 +120,17 @@ export default function CreateRoomPage() {
 
     try {
       // Step 1: Get governance program version
-      setCreateRealmStatus("Detecting SPL Governance version...");
+      setCreateRealmStatus("Preparing...");
       const programVersion = await getGovernanceProgramVersion(connection, SPL_GOVERNANCE_PROGRAM_ID);
 
-      // Step 2: Create governance token mint
-      setCreateRealmStatus("Creating governance token (1/3)...");
+      // Step 2: Create governance token + Realm in one transaction (1/2)
+      setCreateRealmStatus("Creating governance token and Realm (1/2)...");
       const mintKeypair = Keypair.generate();
       const mintRent = await connection.getMinimumBalanceForRentExemption(MintLayout.span);
       const ata = getAssociatedTokenAddressSync(mintKeypair.publicKey, wallet);
 
       const tx1 = new Transaction();
+      // Mint creation instructions
       tx1.add(
         SystemProgram.createAccount({
           fromPubkey: wallet,
@@ -142,42 +143,33 @@ export default function CreateRoomPage() {
         createAssociatedTokenAccountInstruction(wallet, ata, wallet, mintKeypair.publicKey),
         createMintToInstruction(mintKeypair.publicKey, ata, wallet, BigInt(1_000_000 * 1e6)),
       );
-      tx1.feePayer = wallet;
-      const { blockhash: bh1, lastValidBlockHeight: lbh1 } = await connection.getLatestBlockhash("confirmed");
-      tx1.recentBlockhash = bh1;
-      tx1.partialSign(mintKeypair);
-      // wallet adapter signs remaining (feePayer)
-      const signedTx1 = await signTransaction(tx1);
-      const sig1 = await connection.sendRawTransaction(signedTx1.serialize());
-      await connection.confirmTransaction({ signature: sig1, blockhash: bh1, lastValidBlockHeight: lbh1 }, "confirmed");
-
-      // Step 3: Create Realm
-      setCreateRealmStatus("Creating Realm on-chain (2/3)...");
+      // Realm creation instructions appended to same transaction
       const createRealmIxs: any[] = [];
       const realmAddress = await withCreateRealm(
         createRealmIxs,
         SPL_GOVERNANCE_PROGRAM_ID,
         programVersion,
         daoName,
-        wallet,           // realm authority
-        mintKeypair.publicKey,  // community mint
-        wallet,           // payer
-        undefined,        // no council mint
+        wallet,
+        mintKeypair.publicKey,
+        wallet,
+        undefined,
         MintMaxVoteWeightSource.FULL_SUPPLY_FRACTION,
-        new BN(1) as any, // min weight to create governance (1 micro-token)
+        new BN(1) as any,
         undefined,
         undefined,
       );
-      const tx2 = new Transaction().add(...createRealmIxs);
-      tx2.feePayer = wallet;
-      const { blockhash: bh2, lastValidBlockHeight: lbh2 } = await connection.getLatestBlockhash("confirmed");
-      tx2.recentBlockhash = bh2;
-      const signedTx2 = await signTransaction(tx2);
-      const sig2 = await connection.sendRawTransaction(signedTx2.serialize());
-      await connection.confirmTransaction({ signature: sig2, blockhash: bh2, lastValidBlockHeight: lbh2 }, "confirmed");
+      tx1.add(...createRealmIxs);
+      tx1.feePayer = wallet;
+      const { blockhash: bh1, lastValidBlockHeight: lbh1 } = await connection.getLatestBlockhash("confirmed");
+      tx1.recentBlockhash = bh1;
+      tx1.partialSign(mintKeypair);
+      const signedTx1 = await signTransaction(tx1);
+      const sig1 = await connection.sendRawTransaction(signedTx1.serialize());
+      await connection.confirmTransaction({ signature: sig1, blockhash: bh1, lastValidBlockHeight: lbh1 }, "confirmed");
 
-      // Step 4: Deposit governing tokens (become a member)
-      setCreateRealmStatus("Joining as member (3/3)...");
+      // Step 3: Deposit governing tokens — become a Realm member (2/2)
+      setCreateRealmStatus("Joining as member (2/2)...");
       const depositIxs: any[] = [];
       await withDepositGoverningTokens(
         depositIxs,
@@ -186,18 +178,18 @@ export default function CreateRoomPage() {
         realmAddress,
         ata,
         mintKeypair.publicKey,
-        wallet,   // governing token owner
-        wallet,   // source authority (ATA owner)
-        wallet,   // payer
-        new BN(100_000 * 1e6) as any, // deposit 100K tokens
+        wallet,
+        wallet,
+        wallet,
+        new BN(100_000 * 1e6) as any,
       );
-      const tx3 = new Transaction().add(...depositIxs);
-      tx3.feePayer = wallet;
-      const { blockhash: bh3, lastValidBlockHeight: lbh3 } = await connection.getLatestBlockhash("confirmed");
-      tx3.recentBlockhash = bh3;
-      const signedTx3 = await signTransaction(tx3);
-      const sig3 = await connection.sendRawTransaction(signedTx3.serialize());
-      await connection.confirmTransaction({ signature: sig3, blockhash: bh3, lastValidBlockHeight: lbh3 }, "confirmed");
+      const tx2 = new Transaction().add(...depositIxs);
+      tx2.feePayer = wallet;
+      const { blockhash: bh2, lastValidBlockHeight: lbh2 } = await connection.getLatestBlockhash("confirmed");
+      tx2.recentBlockhash = bh2;
+      const signedTx2 = await signTransaction(tx2);
+      const sig2 = await connection.sendRawTransaction(signedTx2.serialize());
+      await connection.confirmTransaction({ signature: sig2, blockhash: bh2, lastValidBlockHeight: lbh2 }, "confirmed");
 
       // Auto-fill realm address and lookup info
       setCreateRealmStatus("");
@@ -482,7 +474,7 @@ export default function CreateRoomPage() {
                 <div className="mt-5 space-y-5 animate-fadeIn">
                   <p className="text-[10px] uppercase tracking-widest text-conclave-textMuted leading-relaxed">
                     Deploys a new Realms DAO with a governance token.
-                    Requires 3 transactions. Auto-links generated Realm.
+                    Requires 2 transactions. Auto-links generated Realm.
                   </p>
                   <div>
                     <label className="block text-[10px] font-bold uppercase tracking-widest text-conclave-text/80 mb-2">DAO Name (Optional)</label>
