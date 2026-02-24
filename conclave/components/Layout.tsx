@@ -18,11 +18,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header className="fixed top-0 left-0 right-0 z-50 h-20 bg-conclave-dark border-b border-white/10">
         {/* Container for the main nav bar - narrower side columns on mobile when connected so HOME/ROOMS/CREATE fit */}
         <div
-          className={`max-w-7xl mx-auto h-full border-x border-white/10 grid relative ${
-            connected
-              ? "grid-cols-[64px_1fr_64px] md:grid-cols-[140px_1fr_140px]"
-              : "grid-cols-[100px_1fr_100px] md:grid-cols-[140px_1fr_140px]"
-          }`}
+          className={`max-w-7xl mx-auto h-full border-x border-white/10 grid relative ${connected
+            ? "grid-cols-[64px_1fr_64px] md:grid-cols-[140px_1fr_140px]"
+            : "grid-cols-[100px_1fr_100px] md:grid-cols-[140px_1fr_140px]"
+            }`}
         >
           {/* Left: Logo */}
           <div className="border-r border-white/10 flex items-center justify-center h-full hover:bg-white/5 transition-colors group cursor-pointer bg-conclave-dark relative z-20">
@@ -40,11 +39,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Center: Navigation - tighter spacing on mobile when 3 items (connected) */}
           <nav
-            className={`flex items-center justify-center h-full relative overflow-hidden bg-conclave-dark shrink-0 ${
-              connected
-                ? "gap-2 px-2 md:gap-8 md:px-8"
-                : "gap-4 px-4 md:gap-8 md:px-8"
-            }`}
+            className={`flex items-center justify-center h-full relative overflow-hidden bg-conclave-dark shrink-0 ${connected
+              ? "gap-2 px-2 md:gap-8 md:px-8"
+              : "gap-4 px-4 md:gap-8 md:px-8"
+              }`}
           >
             <Link
               href="/"
