@@ -542,7 +542,7 @@ export default function RoomDetailPage() {
                   Realms DAO
                 </span>
                 <a
-                  href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
+                  href={`https://app.realms.today/dao/${room.realmAddress}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[10px] uppercase font-bold tracking-widest text-conclave-blue hover:text-white hover:underline transition-colors"
@@ -670,7 +670,7 @@ export default function RoomDetailPage() {
             </h1>
             {room.realmAddress && (
               <a
-                href={`https://app.realms.today/dao/${room.realmAddress}?cluster=devnet`}
+                href={`https://app.realms.today/dao/${room.realmAddress}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[10px] px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold uppercase tracking-widest hover:bg-purple-500/20 transition-colors"
@@ -1077,7 +1077,7 @@ function ProposalsList({
               return (
                 <li key={rp.pubkey}>
                   <a
-                    href={`https://app.realms.today/dao/${realmAddress}/proposal/${rp.pubkey}?cluster=devnet`}
+                    href={`https://app.realms.today/dao/${realmAddress}/proposal/${rp.pubkey}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block rounded-xl border border-purple-500/20 p-4 hover:border-purple-500/40 transition-all"

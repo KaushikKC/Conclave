@@ -72,7 +72,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             </p>
 
             <a
-              href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
+              href={`https://app.realms.today/dao/${realmAddress}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600/80 to-purple-400/80 hover:from-purple-500 hover:to-purple-300 text-white shadow-[0_0_20px_rgba(168,85,247,0.3)] transition-all"
@@ -103,7 +103,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
               </span>
             </div>
             <a
-              href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
+              href={`https://app.realms.today/dao/${realmAddress}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-[10px] font-bold uppercase tracking-widest text-purple-400 hover:text-white transition-colors flex items-center gap-1"
@@ -166,7 +166,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
         </p>
         <div className="flex flex-wrap gap-3">
           <a
-            href={`https://app.realms.today/dao/${realmAddress}?cluster=devnet`}
+            href={`https://app.realms.today/dao/${realmAddress}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 sm:flex-none text-center text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 hover:bg-purple-500/20 hover:border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.1)] transition-all"
@@ -174,7 +174,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             Dashboard
           </a>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}/members?cluster=devnet`}
+            href={`https://app.realms.today/dao/${realmAddress}/members${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 sm:flex-none text-center text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl bg-black/50 text-conclave-textMuted border border-white/10 hover:text-white hover:border-white/20 transition-all"
@@ -182,7 +182,7 @@ export default function RealmsGovernance({ realmAddress }: Props) {
             Members
           </a>
           <a
-            href={`https://app.realms.today/dao/${realmAddress}/treasury?cluster=devnet`}
+            href={`https://app.realms.today/dao/${realmAddress}/treasury${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex-1 sm:flex-none text-center text-[10px] font-black uppercase tracking-widest px-6 py-3 rounded-xl bg-black/50 text-conclave-textMuted border border-white/10 hover:text-white hover:border-white/20 transition-all"

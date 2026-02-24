@@ -18,9 +18,18 @@ import {
 } from "@solana/web3.js";
 import { createHash, randomBytes } from "crypto";
 
-const PROGRAM_ID = new PublicKey("E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU");
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.devnet.solana.com";
+const PROGRAM_ID = new PublicKey(
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU"
+);
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.mainnet-beta.solana.com";
 const INDEXER_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+// Mainnet chain ID: 5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d
+// Devnet chain ID:  EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG
+const CHAIN_ID =
+  process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta"
+    ? "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+    : "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 
 // Solana Actions requires these CORS headers on every response
 const ACTION_HEADERS = {
@@ -29,8 +38,7 @@ const ACTION_HEADERS = {
   "Access-Control-Allow-Headers":
     "Content-Type, x-blockchain-ids, x-action-version",
   "X-Action-Version": "2.1.3",
-  // devnet chain ID
-  "X-Blockchain-Ids": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+  "X-Blockchain-Ids": CHAIN_ID,
 };
 
 function setActionHeaders(res: NextApiResponse) {

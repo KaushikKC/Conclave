@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const CONCLAVE_PROGRAM_ID = new PublicKey(
-  "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU",
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? "E5HrS48LBddCwXGdq4ULPB8bC8rihUReDmu9eRiPQieU",
 );
 
 export function getRoomPda(

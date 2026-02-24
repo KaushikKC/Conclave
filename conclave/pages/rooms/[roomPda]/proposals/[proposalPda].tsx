@@ -798,7 +798,7 @@ export default function ProposalDetailPage() {
                 </div>
               </div>
               <a
-                href={`https://explorer.solana.com/address/${proposalPda}?cluster=devnet`}
+                href={`https://explorer.solana.com/address/${proposalPda}${process.env.NEXT_PUBLIC_SOLANA_CLUSTER === 'mainnet-beta' ? '' : '?cluster=devnet'}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-secondary !py-3 !px-6 !text-[10px] whitespace-nowrap bg-black/50 hover:bg-white/10"
