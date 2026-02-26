@@ -9,6 +9,8 @@
 [![License](https://img.shields.io/badge/license-ISC-green)](LICENSE)
 [![npm](https://img.shields.io/badge/npm-conclave--sdk-CB3837?logo=npm)](https://www.npmjs.com/package/conclave-sdk)
 
+**Live app:** [https://conclave-dao.xyz/](https://conclave-dao.xyz/) · **Demo video:** [https://youtu.be/uxaPb4vJ9lY](https://youtu.be/uxaPb4vJ9lY)
+
 ---
 
 ## The Problem
@@ -281,6 +283,8 @@ commitment  = sha256(vote_count_le_u32(4) ‖ vote_choice(1) ‖ nonce(32))
 Built for the **Solana Graveyard Hackathon — Realms** track, targeting:
 - **Governance Builders** — tooling and governance systems on Realms
 - **Realms Extensions** — integrations that expand existing Realms orgs
+
+**Try it:** [Live app](https://conclave-dao.xyz/) · [Demo video](https://youtu.be/uxaPb4vJ9lY)
 
 **Conclave's value to the Realms ecosystem:**
 1. Any existing Realms DAO can link a Conclave room in minutes
