@@ -494,21 +494,31 @@ RPC_URL=https://mainnet.helius-rpc.com/?api-key=YOUR_KEY
 
 ## Conclave SDK
 
-Build on top of Conclave:
+**Package:** [conclave-sdk on npm](https://www.npmjs.com/package/conclave-sdk) — indexer API client, PDAs (room, member, proposal, treasury, etc.), and TypeScript types for building bots, dashboards, and Realms extensions.
 
-```bash
-npm install conclave-sdk @solana/web3.js
-```
+| | |
+|---|---|
+| **npm** | [https://www.npmjs.com/package/conclave-sdk](https://www.npmjs.com/package/conclave-sdk) |
+| **Install** | `npm install conclave-sdk @solana/web3.js` |
+| **Source** | `conclave/packages/conclave-sdk/` |
+
+**Quick example:**
 
 ```typescript
-import { ConclaveClient, getRoomPda } from "conclave-sdk";
+import { ConclaveClient, getRoomPda, getTreasuryPda } from "conclave-sdk";
+import { PublicKey } from "@solana/web3.js";
 
-const client = new ConclaveClient(connection, wallet);
-const roomPda = getRoomPda(wallet.publicKey, "my-dao");
-await client.createRoom("my-dao", governanceMint);
+const client = new ConclaveClient("https://your-indexer.xyz");
+const rooms = await client.getRooms();
+const room = await client.getRoom(rooms[0].address);
+const proposals = await client.getRoomProposals(room.address);
+
+const authority = new PublicKey("...");
+const roomPda = getRoomPda(authority, "My DAO");
+const treasuryPda = getTreasuryPda(roomPda);
 ```
 
-[npm](https://www.npmjs.com/package/conclave-sdk) · [Source](conclave/packages/conclave-sdk/)
+See the [package README](conclave/packages/conclave-sdk/README.md) for full API and PDA reference.
 
 ---
 
