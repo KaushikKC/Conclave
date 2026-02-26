@@ -4,7 +4,7 @@
   "description": "Conclave event indexer and REST API",
   "main": "index.ts",
   "scripts": {
-    "start": "npx tsx index.ts",
+    "start": "node index.js",
     "dev": "npx tsx watch index.ts",
     "build": "tsc"
   },

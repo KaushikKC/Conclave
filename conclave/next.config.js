@@ -36,7 +36,9 @@ const nextConfig = {
           { key: "X-Action-Version", value: "2.1.3" },
           {
             key: "X-Blockchain-Ids",
-            value: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+            value: process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta"
+              ? "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d"
+              : "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
           },
         ],
       },

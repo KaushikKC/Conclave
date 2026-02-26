@@ -438,7 +438,8 @@ export default function ProposalDetailPage() {
     if (!proposalPda) return;
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     const actionUrl = `${origin}/api/actions/vote/${proposalPda}`;
-    const blinkUrl = `https://dial.to/?action=solana-action:${encodeURIComponent(actionUrl)}`;
+    const clusterParam = process.env.NEXT_PUBLIC_SOLANA_CLUSTER === "mainnet-beta" ? "" : "&cluster=devnet";
+    const blinkUrl = `https://dial.to/?action=solana-action:${encodeURIComponent(actionUrl)}${clusterParam}`;
     navigator.clipboard.writeText(blinkUrl).then(() => {
       setBlinkCopied(true);
       setTimeout(() => setBlinkCopied(false), 2000);
