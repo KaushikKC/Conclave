@@ -17,6 +17,12 @@ const DB_PATH = process.env.VERCEL
   ? "/tmp/conclave.db"
   : process.env.DB_PATH || path.join(__dirname, "conclave.db");
 
+// Ensure the directory containing the DB file exists (needed on Railway volumes)
+const dbDir = path.dirname(DB_PATH);
+if (!fs.existsSync(dbDir)) {
+  fs.mkdirSync(dbDir, { recursive: true });
+}
+
 // --- Database Setup ---
 
 const db = new Database(DB_PATH);
