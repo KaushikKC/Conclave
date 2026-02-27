@@ -97,12 +97,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       <footer className="w-full max-w-7xl mx-auto border-x border-b border-t border-white/10 py-12 text-center bg-conclave-dark relative z-10">
-        <div className="flex items-center justify-center gap-4 mb-8">
+        <div className="flex items-center justify-center gap-4 mb-6">
           <div className="h-px w-20 bg-white/10"></div>
           <p className="text-conclave-text/40 text-[10px] uppercase tracking-[0.3em]">
             Solana Devnet · 2026
           </p>
           <div className="h-px w-20 bg-white/10"></div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-[11px] text-conclave-textMuted px-4">
+          <a
+            href="https://x.com/conclave399521"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="uppercase tracking-[0.18em] font-bold hover:text-white transition-colors"
+          >
+            Twitter / X
+          </a>
+          <span className="hidden sm:inline text-conclave-text/30">·</span>
+          <a
+            href="https://www.npmjs.com/package/conclave-sdk"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="uppercase tracking-[0.18em] font-bold hover:text-white transition-colors"
+          >
+            npm: conclave-sdk
+          </a>
         </div>
       </footer>
     </div>

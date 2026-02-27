@@ -1,6 +1,6 @@
 {
   "name": "conclave-sdk",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Dev toolkit for Conclave — rooms, proposals, PDAs, and indexer API. Build DAO tooling and Realms extensions on Solana.",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
